@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'none';" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta http-equiv="X-Frame-Options" content="DENY" />
+  <meta name="referrer" content="no-referrer" />
+  <title>Beaufort CipherLab - ビューフォート暗号ツール</title>
+  <meta name="description" content="Interactive web tool to learn and visualize the Beaufort cipher: key generation, encryption/decryption, and comparison with Vigenère." />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-content">
+      <h1>Beaufort CipherLab</h1>
+      <p class="site-description">ビューフォート暗号（純正版）を学習・体験できるインタラクティブツール</p>
+    </div>
+  </header>
+  <button id="themeToggle" class="btn-theme-float" aria-label="Toggle theme">
+    <span class="theme-label">Dark</span>
+  </button>
+  <button id="helpToggle" class="btn-help-float" aria-label="Show keyboard shortcuts">
+    ?
+  </button>
+  <div id="helpModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>⌨️ キーボードショートカット</h3>
+        <button id="helpClose" class="btn-close" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="shortcut-list">
+          <div class="shortcut-item">
+            <kbd>Ctrl</kbd> + <kbd>Enter</kbd>
+            <span>一括実行（暗号化/復号）</span>
+          </div>
+          <div class="shortcut-item">
+            <kbd>Space</kbd>
+            <span>アニメーションの再生/一時停止</span>
+          </div>
+          <div class="shortcut-item">
+            <kbd>→</kbd>
+            <span>次の1文字を処理</span>
+          </div>
+          <div class="shortcut-item">
+            <kbd>Esc</kbd>
+            <span>リセット</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <nav class="tabs" role="tablist" aria-label="Main Tabs">
+    <button class="tab active" data-tab="tab-keygen" role="tab" aria-selected="true">鍵生成</button>
+    <button class="tab" data-tab="tab-encrypt" role="tab" aria-selected="false">暗号化</button>
+    <button class="tab" data-tab="tab-decrypt" role="tab" aria-selected="false">復号</button>
+    <button class="tab" data-tab="tab-learn" role="tab" aria-selected="false">座学</button>
+  </nav>
+
+  <main>
+    <!-- 鍵生成 -->
+    <section id="tab-keygen" class="panel active" role="tabpanel">
+      <div class="panel-body">
+        <div class="grid-2">
+          <div>
+            <label>鍵キーワード</label>
+            <input id="kgKeyword" type="text" placeholder="例: NAVY" />
+            <label class="mt-12">平文（長さ参照用）</label>
+            <textarea id="kgPlain" rows="6" placeholder="展開長の参考に使います（未入力でもOK）"></textarea>
+
+            <div class="options mt-12">
+              <label><input id="kgRepeat" type="checkbox" checked /> 平文長に合わせて繰り返し展開</label>
+              <label class="inline"><input id="kgSkipNonAlpha" type="checkbox" checked /> 非英字で鍵を進めない</label>
+              <label class="inline"><input id="kgUpper" type="checkbox" checked /> 大文字化</label>
+              <label>非英字の扱い
+                <select id="kgNonAlpha">
+                  <option value="keep">保持</option>
+                  <option value="drop">除去</option>
+                  <option value="keepSpaces">空白のみ保持</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="actions mt-12">
+              <button id="kgExpandBtn" class="btn primary">鍵文字列に拡張</button>
+              <button id="kgCopyBtn" class="btn">コピー</button>
+              <button id="kgClearBtn" class="btn danger">クリア</button>
+            </div>
+          </div>
+
+          <div>
+            <label>鍵文字列</label>
+            <textarea id="kgExpanded" rows="12" readonly></textarea>
+
+            <details class="mt-12">
+              <summary>位置対応テーブル（Index / Plain / Key）</summary>
+              <div class="table-wrap">
+                <table id="kgTable">
+                  <thead><tr><th>#</th><th>Plain</th><th>Key</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </details>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 暗号化 -->
+    <section id="tab-encrypt" class="panel" role="tabpanel">
+      <div class="panel-body">
+        <div class="grid-2">
+          <div>
+            <label>平文</label>
+            <textarea id="encPlain" rows="8" placeholder="Encrypt this text..."></textarea>
+            <div class="label-with-button mt-12">
+              <label>鍵（鍵文字列）</label>
+              <button id="encSyncBtn" class="btn-sync" title="鍵生成タブの鍵文字列を取得">🔄 同期</button>
+            </div>
+            <input id="encKey" type="text" placeholder="例: NAVY" />
+
+            <div class="options mt-12">
+              <label>非英字の扱い
+                <select id="encNonAlpha">
+                  <option value="keep">保持</option>
+                  <option value="drop">除去</option>
+                  <option value="keepSpaces">空白のみ保持</option>
+                </select>
+              </label>
+              <label class="inline"><input id="encSkipNonAlpha" type="checkbox" checked /> 非英字で鍵を進めない</label>
+              <label class="inline"><input id="encUpper" type="checkbox" checked /> 大文字化</label>
+            </div>
+
+            <div class="actions mt-12">
+              <button id="encStepBtn" class="btn">→ 次の1文字</button>
+              <button id="encPlayBtn" class="btn">▶ アニメーション</button>
+              <label class="speed-select">
+                <select id="encSpeed">
+                  <option value="250">🐌 遅い</option>
+                  <option value="120" selected>🐾 通常</option>
+                  <option value="60">🐇 速い</option>
+                </select>
+              </label>
+              <button id="encResetBtn" class="btn">⟲ リセット</button>
+              <button id="encRunBtn" class="btn primary">⏩ すべて暗号化</button>
+            </div>
+            <div id="encProgress" class="progress-info" style="display:none;"></div>
+
+            <label class="mt-12">暗号文</label>
+            <textarea id="encCipher" rows="5" readonly></textarea>
+            <div class="actions">
+              <button id="encCopyBtn" class="btn">コピー</button>
+              <button id="encClearBtn" class="btn danger">クリア</button>
+            </div>
+          </div>
+
+          <div>
+            <div class="matrix-wrap">
+              <div class="matrix-header">
+                <div>26×26 表（行と列をハイライト）</div>
+              </div>
+              <div id="encMatrix" class="matrix" aria-label="Beaufort Matrix"></div>
+            </div>
+
+            <details class="mt-12" open>
+              <summary>ステップテーブル</summary>
+              <div class="table-wrap">
+                <table id="encSteps">
+                  <thead>
+                    <tr>
+                      <th>#</th><th>P</th><th>K</th><th>式</th><th>数値</th><th>C</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </details>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 復号 -->
+    <section id="tab-decrypt" class="panel" role="tabpanel">
+      <div class="panel-body">
+        <div class="grid-2">
+          <div>
+            <div class="label-with-button">
+              <label>暗号文</label>
+              <button id="decSyncCipherBtn" class="btn-sync" title="暗号化タブの暗号文を取得">🔄 同期</button>
+            </div>
+            <textarea id="decCipher" rows="8" placeholder="Decrypt this text..."></textarea>
+            <div class="label-with-button mt-12">
+              <label>鍵（鍵文字列）</label>
+              <button id="decSyncBtn" class="btn-sync" title="鍵生成タブの鍵文字列を取得">🔄 同期</button>
+            </div>
+            <input id="decKey" type="text" placeholder="例: NAVY" />
+
+            <div class="options mt-12">
+              <label>非英字の扱い
+                <select id="decNonAlpha">
+                  <option value="keep">保持</option>
+                  <option value="drop">除去</option>
+                  <option value="keepSpaces">空白のみ保持</option>
+                </select>
+              </label>
+              <label class="inline"><input id="decSkipNonAlpha" type="checkbox" checked /> 非英字で鍵を進めない</label>
+              <label class="inline"><input id="decUpper" type="checkbox" checked /> 大文字化</label>
+            </div>
+
+            <div class="actions mt-12">
+              <button id="decStepBtn" class="btn">→ 次の1文字</button>
+              <button id="decPlayBtn" class="btn">▶ アニメーション</button>
+              <label class="speed-select">
+                <select id="decSpeed">
+                  <option value="250">🐌 遅い</option>
+                  <option value="120" selected>🐾 通常</option>
+                  <option value="60">🐇 速い</option>
+                </select>
+              </label>
+              <button id="decResetBtn" class="btn">⟲ リセット</button>
+              <button id="decRunBtn" class="btn primary">⏩ すべて復号</button>
+            </div>
+            <div id="decProgress" class="progress-info" style="display:none;"></div>
+
+            <label class="mt-12">平文</label>
+            <textarea id="decPlain" rows="5" readonly></textarea>
+            <div class="actions">
+              <button id="decCopyBtn" class="btn">コピー</button>
+              <button id="decClearBtn" class="btn danger">クリア</button>
+            </div>
+          </div>
+
+          <div>
+            <div class="matrix-wrap">
+              <div class="matrix-header">
+                <div>26×26 表（行と列をハイライト）</div>
+              </div>
+              <div id="decMatrix" class="matrix" aria-label="Beaufort Matrix"></div>
+            </div>
+
+            <details class="mt-12" open>
+              <summary>ステップテーブル</summary>
+              <div class="table-wrap">
+                <table id="decSteps">
+                  <thead>
+                    <tr>
+                      <th>#</th><th>C</th><th>K</th><th>式</th><th>数値</th><th>P</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </details>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 座学 -->
+    <section id="tab-learn" class="panel" role="tabpanel">
+      <div class="panel-body prose">
+        <h2>📚 ビューフォート暗号とは</h2>
+        <p>ビューフォート暗号（Beaufort cipher）は、19世紀にFrancis Beaufort提督が使用した古典暗号で、<strong>暗号化と復号が同じ形式の操作</strong>で行える特徴を持ちます。</p>
+
+        <h3>🔢 数式</h3>
+        <div class="formula-box">
+          <div class="formula-item">
+            <strong>暗号化:</strong> <code>C = (K − P) mod 26</code>
+          </div>
+          <div class="formula-item">
+            <strong>復号:</strong> <code>P = (K − C) mod 26</code>
+          </div>
+        </div>
+
+        <h3>🔍 例題で理解</h3>
+        <div class="example-box">
+          <p><strong>平文:</strong> C (= 2) 　<strong>鍵:</strong> P (= 15)</p>
+          <p><strong>計算:</strong> (15 − 2) mod 26 = 13</p>
+          <p><strong>暗号文:</strong> N (= 13)</p>
+        </div>
+
+        <h3>⚖️ ヴィジュネル暗号との比較</h3>
+        <div class="comparison-box">
+          <div class="comparison-item">
+            <h4>ヴィジュネル暗号</h4>
+            <div class="formula-item"><strong>暗号化:</strong> <code>C = (P + K) mod 26</code></div>
+            <div class="formula-item"><strong>復号:</strong> <code>P = (C − K) mod 26</code></div>
+            <p>加算ベース、<strong>暗号化と復号で異なる操作</strong></p>
+          </div>
+          <div class="comparison-item">
+            <h4>ビューフォート暗号</h4>
+            <div class="formula-item"><strong>暗号化:</strong> <code>C = (K − P) mod 26</code></div>
+            <div class="formula-item"><strong>復号:</strong> <code>P = (K − C) mod 26</code></div>
+            <p>減算ベース、<strong>暗号化と復号が同一操作</strong></p>
+          </div>
+        </div>
+
+        <h3>⚠️ 弱点</h3>
+        <ul>
+          <li>頻度分析やカシスキー法で解析可能</li>
+          <li>現代の暗号としては不十分（教育目的のみ）</li>
+        </ul>
+
+        <p>詳細な歴史や追加情報は <a href="https://github.com/ipusiron/beaufort-cipherlab" target="_blank" rel="noopener">README.md</a> をご参照ください。</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer">
+      🔗 GitHubリポジトリはこちら（ <a href="https://github.com/ipusiron/beaufort-cipherlab" target="_blank" rel="noopener">ipusiron/beaufort-cipherlab</a> ）
+    </div>
+  </footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="js/normalize.js"></script>
+  <script src="js/beaufort.js"></script>
+  <script src="js/visualize.js"></script>
+  <script src="js/toaster.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
