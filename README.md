@@ -1,11 +1,39 @@
 <!--
 ---
-title: Beaufort CipherLab
-category: classical-cryptography
-difficulty: 2
-description: Interactive web tool to learn and visualize the pure Beaufort cipher: key generation, encryption/decryption, and comparison with Vigenère.
-tags: [beaufort, vigenere, cipher, classical-crypto, education, visualization, javascript]
-demo: https://ipusiron.github.io/beaufort-cipherlab/
+id: day078
+slug: beaufort-cipherlab
+
+title: "Beaufort CipherLab"
+
+subtitle_ja: "ビューフォート暗号ツール"
+subtitle_en: "Beaufort Cipher Learning Tool"
+
+description_ja: "純正ビューフォート暗号を学習・体験できるインタラクティブツール。鍵生成、暗号化、復号を可視化し、ヴィジュネル暗号との違いを理解できます。"
+description_en: "Interactive web tool to learn and visualize the pure Beaufort cipher: key generation, encryption/decryption, and comparison with Vigenère."
+
+category_ja:
+  - 古典暗号
+  - 換字式暗号
+category_en:
+  - Classical Cryptography
+  - Substitution Cipher
+
+difficulty: 4
+
+tags:
+  - beaufort
+  - vigenere
+  - cipher
+  - classical-crypto
+  - polyalphabetic
+  - education
+  - visualization
+  - javascript
+
+repo_url: "https://github.com/ipusiron/beaufort-cipherlab"
+demo_url: "https://ipusiron.github.io/beaufort-cipherlab/"
+
+hub: true
 ---
 -->
 

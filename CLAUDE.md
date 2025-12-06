@@ -28,15 +28,13 @@ npx http-server
 
 ### Module Structure
 
-The application follows a modular structure with separate JavaScript files:
+The application follows a modular structure with separate JavaScript files loaded in dependency order:
 
-- **normalize.js**: Text normalization utilities (uppercase conversion, non-alpha handling, character-to-index conversion)
-- **beaufort.js**: Core cipher algorithms - implements both pure `C = (K - P) mod 26` and variant `C = (P - K) mod 26` modes
-- **visualize.js**: 26×26 matrix visualization, highlighting row/column intersections during encryption/decryption
-- **toaster.js**: Toast notification system for user feedback
-- **app.js**: Main application controller - handles UI interactions, state management, and coordinates between modules
-
-All modules attach to `window` global (e.g., `window.Norm`, `window.Beaufort`, `window.Viz`, `window.Toast`).
+1. **normalize.js** → `window.Norm`: Text normalization utilities (uppercase conversion, non-alpha handling, character-to-index conversion, key expansion)
+2. **beaufort.js** → `window.Beaufort`: Core cipher algorithms - pure Beaufort `C = (K - P) mod 26`. Depends on `Norm`.
+3. **visualize.js** → `window.Viz`: 26×26 matrix visualization (27×27 grid including headers), highlighting row/column intersections
+4. **toaster.js** → `window.Toast`: Toast notification system for user feedback
+5. **app.js**: Main application controller - handles UI interactions, state management, and coordinates between modules. Depends on all above.
 
 ### Key Concepts
 
@@ -51,6 +49,11 @@ All modules attach to `window` global (e.g., `window.Norm`, `window.Beaufort`, `
 
 **Key Expansion:**
 The `Norm.expandKey()` function handles repeating the keyword to match plaintext length. When `skipOnNonAlpha` is true, the key doesn't advance for non-alphabetic characters (placeholder `·` is used).
+
+**Non-Alphabetic Character Handling (`nonAlpha` option):**
+- `keep`: Preserve all non-alphabetic characters in output
+- `drop`: Remove all non-alphabetic characters
+- `keepSpaces`: Remove non-alphabetic except spaces
 
 ### State Management
 
@@ -72,7 +75,8 @@ Four main tabs in `index.html`:
 - `Ctrl+Enter`: Bulk encrypt/decrypt on active tab
 - `Space`: Play/pause animation
 - `→`: Step forward one character
-- `Esc`: Reset to beginning
+- `Esc`: Reset to beginning (or close help modal)
+- `?`: Show keyboard shortcuts help
 
 ## Code Conventions
 
