@@ -250,6 +250,25 @@ Changing input or settings, or syncing a field, clears that tab's result and pro
 Clear removes the tab's input and result, but does not clear a copied clipboard value.
 Switching tabs, hiding the page, opening help, or switching languages pauses playback.
 
+Open “Learning samples” in Encrypt to choose from three examples: the ACA basic example, wraparound and spaces, or fullwidth letters and symbols.
+Selecting a sample replaces the plaintext, key and settings.
+“Input preview (normalization)” shows the text and key used for processing, along with conversion and removal counts.
+Counts can overlap: a fullwidth lowercase letter counts as both a width conversion and an uppercase conversion.
+
+Use “Previous character”, “Go to start” and “Go to position” to select a calculation position.
+Positions count processed characters after normalization; 0 is the start.
+Step tables use 300-row pages; changing the displayed page does not change the output or calculation position.
+Going back, selecting a position or changing pages pauses playback.
+
+“Decrypt with the same key/settings and compare” encrypts all plaintext, replaces the Decrypt input, key and settings, then decrypts it.
+The comparison target is normalized plaintext.
+The original input, expected text and decrypted result are displayed together.
+Change the decryption key or settings and run again to see the first differing position and up to eight characters on each side.
+Context uses JSON string notation: `\n` indicates a line break and `\t` a tab.
+`→ [character] ←` marks the difference; `<end of text>` means no character is present.
+Changing encryption input or settings clears the comparison target; incomplete decryption is not classified as a match.
+This does not restore original spelling or removed characters, and a match proves neither security nor the absence of tampering.
+
 ---
 
 ## 📋 Detailed specifications
@@ -274,7 +293,7 @@ Switching tabs, hiding the page, opening help, or switching languages pauses pla
 
 - 26×26 table plus headers, scrolling within its frame and following the highlighted intersection
 - An outline as well as color marks the intersection; the step table also shows the letters and calculation
-- Alignment and step tables show the first 300 rows; the full result is not truncated
+- Key alignment shows the first 300 rows; step tables show processed rows in 300-row pages with previous/next navigation. The full result is not truncated
 - Animation delay: slow 250ms, normal 120ms, fast 60ms; processing time affects the actual interval
 - Bulk and step execution use the same calculated trace
 
@@ -373,17 +392,20 @@ beaufort-cipherlab/
 │   ├── messages.js
 │   ├── normalize.js
 │   ├── beaufort.js
+│   ├── learning.js
 │   ├── visualize.js
 │   ├── toaster.js
 │   └── app.js
 └── test/
     ├── core.test.js
+    ├── learning.test.js
     ├── ui.test.js
     └── readme.test.js
 ```
 
 `normalize.js` handles normalization, `beaufort.js` calculations, `visualize.js` tables, and `app.js` interaction state.
 `preferences.js` applies initial preferences and `messages.js` manages Japanese and English text.
+`learning.js` manages normalization previews, trace windows, string comparison and learning samples.
 
 ## 💻 Running and testing
 
