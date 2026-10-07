@@ -59,7 +59,7 @@
   // @param {HTMLElement} container - 表のコンテナー
   // @param {number} rowIndex - 行インデックス（鍵文字）
   // @param {number} colIndex - 列インデックス（平文/暗号文字）
-  function highlight(container, { rowIndex, colIndex, cellIndex }) {
+  function highlight(container, { rowIndex, colIndex }) {
     const children = container.children;
     const rowStart = 27 + rowIndex * 27;
 
@@ -79,13 +79,6 @@
     children[cellPos]?.classList.add('hi-cell');
   }
 
-  // セル内の文字を更新（オプション機能）
-  function setCellLetter(container, letterAt, rowIndex, colIndex, letter) {
-    const cellPos = 1 + (rowIndex + 1) * 27 + (colIndex + 1);
-    const div = container.children[cellPos];
-    if (div) div.textContent = letter;
-  }
-
   // ステップテーブルに行を追加
   // @param {HTMLElement} tbody - テーブルのtbody要素
   // @param {Array<string>} cells - セルのテキスト配列
@@ -103,5 +96,5 @@
     if (wrap) wrap.scrollTop = wrap.scrollHeight;
   }
 
-  global.Viz = { buildMatrix, clearHighlights, highlight, setCellLetter, addStepRow };
+  global.Viz = { buildMatrix, clearHighlights, highlight, addStepRow };
 })(window);

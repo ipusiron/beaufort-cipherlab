@@ -4,45 +4,80 @@
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
+  const t = Messages.t;
+
   // ===== テーマ切替 =====
   const themeToggle = $('#themeToggle');
   const themeLabel = $('.theme-label');
-  let storedTheme;
-  try { storedTheme = localStorage.getItem('beaufort.theme'); } catch { /* storage is optional */ }
-  const isDark = storedTheme === 'dark';
-  if (isDark) {
-    document.documentElement.classList.add('dark');
-    themeLabel.textContent = 'Light';
-  }
   themeToggle?.addEventListener('click', () => {
     const isDark = document.documentElement.classList.toggle('dark');
-    themeLabel.textContent = isDark ? 'Light' : 'Dark';
+    updateThemeLabel();
     try { localStorage.setItem('beaufort.theme', isDark ? 'dark' : 'light'); } catch { /* storage is optional */ }
   });
+
+  function updateThemeLabel() {
+    themeLabel.textContent = t(document.documentElement.classList.contains('dark') ? 'themeLight' : 'themeDark');
+    themeToggle.setAttribute('aria-label', themeLabel.textContent);
+  }
 
   // ===== ヘルプモーダル（キーボードショートカット）=====
   const helpToggle = $('#helpToggle');
   const helpModal = $('#helpModal');
   const helpClose = $('#helpClose');
+  let returnFocus = null;
+  function closeHelp() {
+    helpModal.hidden = true;
+    for (const el of document.querySelectorAll('header, nav, main, .toolbar')) el.inert = false;
+    returnFocus?.focus();
+  }
   helpToggle?.addEventListener('click', () => {
-    helpModal.style.display = 'flex';
+    encStop(); decStop();
+    returnFocus = document.activeElement;
+    helpModal.hidden = false;
+    for (const el of document.querySelectorAll('header, nav, main, .toolbar')) el.inert = true;
+    helpClose.focus();
   });
   helpClose?.addEventListener('click', () => {
-    helpModal.style.display = 'none';
+    closeHelp();
   });
   helpModal?.addEventListener('click', (e) => {
-    if (e.target === helpModal) helpModal.style.display = 'none';
+    if (e.target === helpModal) closeHelp();
   });
 
   // ===== タブ切替 =====
   $$('.tab').forEach(btn => {
     btn.addEventListener('click', () => {
       encStop(); decStop();
-      $$('.tab').forEach(b => b.classList.remove('active'));
+      $$('.tab').forEach(b => {
+        b.classList.remove('active');
+        b.setAttribute('aria-selected', String(b === btn));
+        b.tabIndex = b === btn ? 0 : -1;
+      });
       btn.classList.add('active');
       const id = btn.dataset.tab;
       $$('.panel').forEach(p => p.classList.remove('active'));
       $('#' + id)?.classList.add('active');
+    });
+  });
+
+  const tabs = $$('.tab');
+  tabs.forEach((tab, index) => {
+    tab.id = 'tab-button-' + index;
+    tab.setAttribute('aria-controls', tab.dataset.tab);
+    tab.tabIndex = index === 0 ? 0 : -1;
+    $('#' + tab.dataset.tab).setAttribute('aria-labelledby', tab.id);
+    tab.addEventListener('keydown', event => {
+      let next;
+      if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+      if (event.key === 'ArrowLeft') next = (index + tabs.length - 1) % tabs.length;
+      if (event.key === 'Home') next = 0;
+      if (event.key === 'End') next = tabs.length - 1;
+      if (next !== undefined) {
+        event.preventDefault();
+        event.stopPropagation();
+        tabs[next].click();
+        tabs[next].focus();
+      }
     });
   });
 
@@ -65,12 +100,12 @@
   kg.expandBtn.addEventListener('click', () => {
     const keyword = kg.keyword.value;
     if (!Norm.normalizeKey(keyword)) {
-      Toast.show('鍵キーワードに英字がありません');
+      Toast.show(t('invalidKey'));
       return;
     }
     const plain = kg.plain.value;
     if (Array.from(plain).length > 10000 || Array.from(keyword).length > 10000) {
-      Toast.show('入力は各欄10,000文字以内にしてください');
+      Toast.show(t('inputTooLong'));
       return;
     }
     const normPlain = Norm.normalize(plain, { upper: kg.upper.checked, nonAlpha: kg.nonAlpha.value });
@@ -94,7 +129,7 @@
       kg.table.appendChild(tr);
     }
 
-    Toast.show('鍵文字列に展開しました');
+    Toast.show(t('expanded'));
   });
 
   // コピーボタン
@@ -125,32 +160,32 @@
   encSyncBtn?.addEventListener('click', () => {
     const keyText = kg.expanded.value;
     if (!keyText) {
-      Toast.show('鍵生成タブで鍵文字列を生成してください');
+      Toast.show(t('needKey'));
       return;
     }
     enc.key.value = keyText;
     invalidate('enc');
-    Toast.show('鍵文字列を同期');
+    Toast.show(t('syncedKey'));
   });
   decSyncBtn?.addEventListener('click', () => {
     const keyText = kg.expanded.value;
     if (!keyText) {
-      Toast.show('鍵生成タブで鍵文字列を生成してください');
+      Toast.show(t('needKey'));
       return;
     }
     dec.key.value = keyText;
     invalidate('dec');
-    Toast.show('鍵文字列を同期');
+    Toast.show(t('syncedKey'));
   });
   decSyncCipherBtn?.addEventListener('click', () => {
     const cipherText = enc.out.value;
     if (!cipherText) {
-      Toast.show('暗号化タブで暗号文を生成してください');
+      Toast.show(t('needCipher'));
       return;
     }
     dec.cipher.value = cipherText;
     invalidate('dec');
-    Toast.show('暗号文を同期');
+    Toast.show(t('syncedCipher'));
   });
 
   // 暗号化/復号のオプションを取得
@@ -179,7 +214,7 @@
       return true;
     } catch (error) {
       Toast.show(error.message === 'inputTooLong'
-        ? '入力は各欄10,000文字以内にしてください' : '鍵に英字が含まれていません');
+        ? t('inputTooLong') : t('invalidKey'));
       return false;
     }
   }
@@ -247,7 +282,7 @@
   function encPlay() {
     if (encState.playing) return;
     encState.playing = true;
-    enc.playBtn.textContent = '一時停止 ⏸';
+    enc.playBtn.textContent = t('pause');
     const tick = () => {
       const cont = encStepOnce();
       if (!cont) { encStop(); return; }
@@ -259,7 +294,7 @@
   // アニメーション停止
   function encStop() {
     encState.playing = false;
-    enc.playBtn.textContent = '▶ アニメーション';
+    enc.playBtn.textContent = t('play');
     if (encState.timer) clearTimeout(encState.timer);
     encState.timer = null;
   }
@@ -275,7 +310,7 @@
     const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
     encState.i = encState.input.length;
     updateEncProgress();
-    Toast.show(`暗号化完了 (${elapsed}秒)`);
+    Toast.show(t('encrypted', { seconds: elapsed }));
   });
 
   // 次の1文字ボタン
@@ -302,7 +337,7 @@
       const percent = Math.round((encState.i / encState.input.length) * 100);
       progress.textContent = '';
       const textDiv = document.createElement('div');
-      textDiv.textContent = `進行状況: ${encState.i} / ${encState.input.length} 文字 (${percent}%)`;
+      textDiv.textContent = t('progress', { done: encState.i, total: encState.input.length, percent });
       const barDiv = document.createElement('div');
       barDiv.className = 'progress-bar';
       const fillDiv = document.createElement('div');
@@ -311,9 +346,9 @@
       barDiv.appendChild(fillDiv);
       progress.appendChild(textDiv);
       progress.appendChild(barDiv);
-      progress.style.display = 'block';
+      progress.hidden = false;
     } else {
-      progress.style.display = 'none';
+      progress.hidden = true;
     }
   }
 
@@ -389,7 +424,7 @@
   function decPlay() {
     if (decState.playing) return;
     decState.playing = true;
-    dec.playBtn.textContent = '一時停止 ⏸';
+    dec.playBtn.textContent = t('pause');
     const tick = () => {
       const cont = decStepOnce();
       if (!cont) { decStop(); return; }
@@ -401,7 +436,7 @@
   // アニメーション停止
   function decStop() {
     decState.playing = false;
-    dec.playBtn.textContent = '▶ アニメーション';
+    dec.playBtn.textContent = t('play');
     if (decState.timer) clearTimeout(decState.timer);
     decState.timer = null;
   }
@@ -417,7 +452,7 @@
     const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
     decState.i = decState.input.length;
     updateDecProgress();
-    Toast.show(`復号完了 (${elapsed}秒)`);
+    Toast.show(t('decrypted', { seconds: elapsed }));
   });
 
   // 次の1文字ボタン
@@ -444,7 +479,7 @@
       const percent = Math.round((decState.i / decState.input.length) * 100);
       progress.textContent = '';
       const textDiv = document.createElement('div');
-      textDiv.textContent = `進行状況: ${decState.i} / ${decState.input.length} 文字 (${percent}%)`;
+      textDiv.textContent = t('progress', { done: decState.i, total: decState.input.length, percent });
       const barDiv = document.createElement('div');
       barDiv.className = 'progress-bar';
       const fillDiv = document.createElement('div');
@@ -453,9 +488,9 @@
       barDiv.appendChild(fillDiv);
       progress.appendChild(textDiv);
       progress.appendChild(barDiv);
-      progress.style.display = 'block';
+      progress.hidden = false;
     } else {
-      progress.style.display = 'none';
+      progress.hidden = true;
     }
   }
 
@@ -508,17 +543,34 @@
   async function copyText(value) {
     try {
       await navigator.clipboard.writeText(value);
-      Toast.show('コピーしました');
+      Toast.show(t('copied'));
     } catch {
-      Toast.show('コピーできません。結果欄を選択して手動でコピーしてください');
+      Toast.show(t('copyFailed'));
     }
   }
+
+  document.addEventListener('languagechange', () => {
+    encStop(); decStop();
+    updateEncProgress(); updateDecProgress(); updateThemeLabel();
+    $('#toast').classList.remove('show');
+    $('#toast').textContent = '';
+    $('#encMatrix').setAttribute('aria-label', t('matrixEnc'));
+    $('#decMatrix').setAttribute('aria-label', t('matrixDec'));
+    for (const el of [enc.speed, dec.speed]) el.setAttribute('aria-label', t('speed'));
+    $('.tabs').setAttribute('aria-label', t('tabs'));
+    helpToggle.setAttribute('aria-label', t('help'));
+    helpClose.setAttribute('aria-label', t('close'));
+  });
+  Messages.init();
 
   // ===== キーボードショートカット =====
   document.addEventListener('keydown', (e) => {
     const active = $('.panel.active')?.id || '';
     if (e.isComposing || e.repeat) return;
-    if (helpModal.style.display === 'flex' && e.key !== 'Escape') return;
+    if (!helpModal.hidden && e.key !== 'Escape') {
+      if (e.key === 'Tab') { e.preventDefault(); helpClose.focus(); }
+      return;
+    }
     // Ctrl+Enter: 一括実行
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
@@ -539,8 +591,8 @@
     // Esc: リセットまたはモーダルを閉じる
     if (e.key === 'Escape') {
       const helpModal = $('#helpModal');
-      if (helpModal.style.display === 'flex') {
-        helpModal.style.display = 'none';
+      if (!helpModal.hidden) {
+        closeHelp();
         return;
       }
       if (active === 'tab-encrypt') enc.resetBtn.click();

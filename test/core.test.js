@@ -19,7 +19,9 @@ test('676 pairs match independent subtraction and reciprocal transformation', ()
   }
 });
 for (const [text, key, expected] of [
-  ['DCODE', 'KEY', 'HCKHA'], ['akademeia', 'NAVY', 'NQVVJORQN'], ['C', 'P', 'N']
+  ['DCODE', 'KEY', 'HCKHA'], ['akademeia', 'NAVY', 'NQVVJORQN'], ['C', 'P', 'N'],
+  ['CEQUALSKMINUSP', 'RECIPROCAL', 'PAMOPGWSODEKKT'],
+  ['SENDSUPPLIES', 'COMET', 'KKZBBIZXTLYW']
 ]) test('known answer ' + text, () => {
   assert.equal(Beaufort.encrypt({ text, key }).output, expected);
 });
