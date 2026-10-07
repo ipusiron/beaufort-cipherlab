@@ -66,6 +66,7 @@
     matrixDec: ['暗号表。行は鍵、列は暗号文、交点は平文', 'Cipher table: key row, ciphertext column, plaintext intersection'],
     speed: ['再生速度', 'Animation speed'],
     language: ['English', '日本語'],
+    readmeFile: ['README.md', 'README.en.md'],
     tabs: ['メインタブ', 'Main tabs'], help: ['キーボードショートカット', 'Keyboard shortcuts'], close: ['閉じる', 'Close']
   };
   let language = document.documentElement.lang;
@@ -79,6 +80,9 @@
     for (const [element, attribute, pair] of attrs) element.setAttribute(attribute, pair[column]);
     document.documentElement.lang = language;
     document.querySelector('#languageToggle').textContent = t('language');
+    const readmeLink = document.querySelector('#readmeLink');
+    readmeLink.textContent = t('readmeFile');
+    readmeLink.href = 'https://github.com/ipusiron/beaufort-cipherlab/blob/main/' + t('readmeFile');
     document.dispatchEvent(new Event('languagechange'));
   }
   function init() {

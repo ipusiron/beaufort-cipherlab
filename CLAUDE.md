@@ -1,5 +1,29 @@
 # CLAUDE.md
 
+## Verified behavior and maintenance
+
+- Run `npm test` with Node.js 22 or later. No installation is required.
+- Preserve classic scripts and both HTTP and file:// operation.
+- Use `Beaufort.encrypt` / `Beaufort.decrypt`. The UI prepares one trace and
+  uses it for bulk, stepping, and playback.
+- Normalize fullwidth Latin letters to ASCII, then preserve letter case when
+  uppercase conversion is off. Only ASCII letters are cipher symbols.
+- Count text by Unicode code points, not UTF-16 code units. Non-letter removal
+  happens before key advancement. Keep-spaces means U+0020 only.
+- Limit each input to 10,000 code points. Show at most 300 table rows, but never
+  truncate the result. Reject oversized input explicitly.
+- Input, setting, sync, and clear operations invalidate the corresponding result
+  and playback state. Tab/language changes and page hiding stop playback.
+- `preferences.js` runs before CSS; `messages.js` owns Japanese/English text.
+  Language order: query parameter, saved preference, browser language.
+- Store only language and theme. Storage and clipboard denial must be handled.
+- Update both READMEs with matching headings, examples, tables, and images.
+- Table B is `(key - input) mod 26`, not the Variant Beaufort table.
+- Do not assert historical details without a checked source. The Franksen paper's
+  bibliographic entry and abstract do not establish every origin claim.
+- No external libraries, network calls, inline script/style, or fake HTTP-only
+  security headers in meta tags. Use textContent for user-derived text.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
@@ -20,8 +44,6 @@ For development with live reload:
 ```bash
 # Any local server works, for example:
 python -m http.server 8000
-# or
-npx http-server
 ```
 
 ## Code Architecture
@@ -89,8 +111,7 @@ Four main tabs in `index.html`:
 
 ## Internationalization
 
-The UI is in Japanese. When making changes:
-- Keep button labels in Japanese (例: "暗号化", "復号", "一括実行")
-- Toast messages are in Japanese
-- Code comments can be in English
-- Mathematical notation follows Japanese conventions (例: 「K − P」)
+The UI supports Japanese and English. Keep static labels and dynamic messages
+in `js/messages.js`. Translate hidden panels, placeholders, help, and accessible
+names as well as visible text. Switching language must retain input and results,
+pause playback, and relocalize progress. Keep README.en.md complete, not summarized.
