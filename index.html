@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'none';" />
-  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-  <meta http-equiv="X-Frame-Options" content="DENY" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'none';" />
   <meta name="referrer" content="no-referrer" />
+  <link rel="icon" href="data:," />
   <title>Beaufort CipherLab - ビューフォート暗号ツール</title>
   <meta name="description" content="Interactive web tool to learn and visualize the Beaufort cipher: key generation, encryption/decryption, and comparison with Vigenère." />
+  <script src="js/preferences.js"></script>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -18,16 +18,22 @@
       <p class="site-description">ビューフォート暗号（純正版）を学習・体験できるインタラクティブツール</p>
     </div>
   </header>
+  <div class="toolbar">
+  <button id="languageToggle" class="btn" type="button">English</button>
   <button id="themeToggle" class="btn-theme-float" aria-label="Toggle theme">
     <span class="theme-label">Dark</span>
   </button>
   <button id="helpToggle" class="btn-help-float" aria-label="Show keyboard shortcuts">
     ?
   </button>
-  <div id="helpModal" class="modal" style="display:none;">
+  </div>
+  <p class="usage-note">入力は各欄10,000文字まで。対応表と手順表は先頭300行、結果は全文です。</p>
+  <p class="usage-note">全角英字は半角に変換します。大文字化OFFでは英字の大小を保ちます。非英字は暗号化しません。</p>
+  <p class="usage-note">入力や設定を変えると結果と進行を消します。同期するのは欄の文字列だけで、設定は移しません。</p>
+  <div id="helpModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle" hidden>
     <div class="modal-content">
       <div class="modal-header">
-        <h3>⌨️ キーボードショートカット</h3>
+        <h3 id="helpTitle">⌨️ キーボードショートカット</h3>
         <button id="helpClose" class="btn-close" aria-label="Close">×</button>
       </div>
       <div class="modal-body">
@@ -66,9 +72,9 @@
       <div class="panel-body">
         <div class="grid-2">
           <div>
-            <label>鍵キーワード</label>
+            <label for="kgKeyword">鍵キーワード</label>
             <input id="kgKeyword" type="text" placeholder="例: NAVY" />
-            <label class="mt-12">平文（長さ参照用）</label>
+            <label for="kgPlain" class="mt-12">平文（長さ参照用）</label>
             <textarea id="kgPlain" rows="6" placeholder="展開長の参考に使います（未入力でもOK）"></textarea>
 
             <div class="options mt-12">
@@ -92,7 +98,7 @@
           </div>
 
           <div>
-            <label>鍵文字列</label>
+            <label for="kgExpanded">鍵文字列</label>
             <textarea id="kgExpanded" rows="12" readonly></textarea>
 
             <details class="mt-12">
@@ -114,10 +120,10 @@
       <div class="panel-body">
         <div class="grid-2">
           <div>
-            <label>平文</label>
+            <label for="encPlain">平文</label>
             <textarea id="encPlain" rows="8" placeholder="Encrypt this text..."></textarea>
             <div class="label-with-button mt-12">
-              <label>鍵（鍵文字列）</label>
+              <label for="encKey">鍵（鍵文字列）</label>
               <button id="encSyncBtn" class="btn-sync" title="鍵生成タブの鍵文字列を取得">🔄 同期</button>
             </div>
             <input id="encKey" type="text" placeholder="例: NAVY" />
@@ -147,9 +153,9 @@
               <button id="encResetBtn" class="btn">⟲ リセット</button>
               <button id="encRunBtn" class="btn primary">⏩ すべて暗号化</button>
             </div>
-            <div id="encProgress" class="progress-info" style="display:none;"></div>
+            <div id="encProgress" class="progress-info" hidden></div>
 
-            <label class="mt-12">暗号文</label>
+            <label for="encCipher" class="mt-12">暗号文</label>
             <textarea id="encCipher" rows="5" readonly></textarea>
             <div class="actions">
               <button id="encCopyBtn" class="btn">コピー</button>
@@ -158,11 +164,12 @@
           </div>
 
           <div>
+            <p class="table-note">表は枠の中を縦横にスクロールできます。選んだ文字と計算は手順表でも確認できます。</p>
             <div class="matrix-wrap">
               <div class="matrix-header">
                 <div>26×26 表（行と列をハイライト）</div>
               </div>
-              <div id="encMatrix" class="matrix" aria-label="Beaufort Matrix"></div>
+              <div id="encMatrix" class="matrix" role="img" tabindex="0" aria-label="Beaufort Matrix"></div>
             </div>
 
             <details class="mt-12" open>
@@ -189,12 +196,12 @@
         <div class="grid-2">
           <div>
             <div class="label-with-button">
-              <label>暗号文</label>
+              <label for="decCipher">暗号文</label>
               <button id="decSyncCipherBtn" class="btn-sync" title="暗号化タブの暗号文を取得">🔄 同期</button>
             </div>
             <textarea id="decCipher" rows="8" placeholder="Decrypt this text..."></textarea>
             <div class="label-with-button mt-12">
-              <label>鍵（鍵文字列）</label>
+              <label for="decKey">鍵（鍵文字列）</label>
               <button id="decSyncBtn" class="btn-sync" title="鍵生成タブの鍵文字列を取得">🔄 同期</button>
             </div>
             <input id="decKey" type="text" placeholder="例: NAVY" />
@@ -224,9 +231,9 @@
               <button id="decResetBtn" class="btn">⟲ リセット</button>
               <button id="decRunBtn" class="btn primary">⏩ すべて復号</button>
             </div>
-            <div id="decProgress" class="progress-info" style="display:none;"></div>
+            <div id="decProgress" class="progress-info" hidden></div>
 
-            <label class="mt-12">平文</label>
+            <label for="decPlain" class="mt-12">平文</label>
             <textarea id="decPlain" rows="5" readonly></textarea>
             <div class="actions">
               <button id="decCopyBtn" class="btn">コピー</button>
@@ -235,11 +242,12 @@
           </div>
 
           <div>
+            <p class="table-note">表は枠の中を縦横にスクロールできます。選んだ文字と計算は手順表でも確認できます。</p>
             <div class="matrix-wrap">
               <div class="matrix-header">
                 <div>26×26 表（行と列をハイライト）</div>
               </div>
-              <div id="decMatrix" class="matrix" aria-label="Beaufort Matrix"></div>
+              <div id="decMatrix" class="matrix" role="img" tabindex="0" aria-label="Beaufort Matrix"></div>
             </div>
 
             <details class="mt-12" open>
@@ -264,7 +272,7 @@
     <section id="tab-learn" class="panel" role="tabpanel">
       <div class="panel-body prose">
         <h2>📚 ビューフォート暗号とは</h2>
-        <p>ビューフォート暗号（Beaufort cipher）は、19世紀にFrancis Beaufort提督が使用した古典暗号で、<strong>暗号化と復号が同じ形式の操作</strong>で行える特徴を持ちます。</p>
+        <p>ビューフォート暗号は、多表式の古典暗号です。同じ鍵と設定なら、暗号化と復号に同じ計算を使えます。</p>
 
         <h3>🔢 数式</h3>
         <div class="formula-box">
@@ -305,19 +313,21 @@
           <li>現代の暗号としては不十分（教育目的のみ）</li>
         </ul>
 
-        <p>詳細な歴史や追加情報は <a href="https://github.com/ipusiron/beaufort-cipherlab" target="_blank" rel="noopener">README.md</a> をご参照ください。</p>
+        <p>詳細な歴史や追加情報は <a id="readmeLink" href="https://github.com/ipusiron/beaufort-cipherlab/blob/main/README.md" target="_blank" rel="noopener">README.md</a> をご参照ください。</p>
       </div>
     </section>
   </main>
 
+  <p class="usage-note">安全な通信や秘密の保管には使えません。鍵と文章は送信せず、このページ内で処理します。</p>
   <footer>
     <div class="footer">
-      🔗 GitHubリポジトリはこちら（ <a href="https://github.com/ipusiron/beaufort-cipherlab" target="_blank" rel="noopener">ipusiron/beaufort-cipherlab</a> ）
+      🔗 GitHubリポジトリー（ <a href="https://github.com/ipusiron/beaufort-cipherlab" target="_blank" rel="noopener">ipusiron/beaufort-cipherlab</a> ）
     </div>
   </footer>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+  <script src="js/messages.js"></script>
   <script src="js/normalize.js"></script>
   <script src="js/beaufort.js"></script>
   <script src="js/visualize.js"></script>

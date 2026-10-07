@@ -1,12 +1,12 @@
 // visualize.js - 26×26暗号表の描画とハイライト処理
 (function (global) {
   // 26×26のビューフォート暗号表（Table B）を構築
-  // 各行は前の行から1文字分左（逆方向）にシフト
+  // 同じ列を下へ進むと文字の値が1増える
   // - 0行目: ヘッダー行（列ヘッダー）
   // - 0列目: ヘッダー列（行ヘッダー）
   // - 行i、列jのセル = (i - j) mod 26
   function buildMatrix(container) {
-    container.innerHTML = '';
+    container.textContent = '';
     const frag = document.createDocumentFragment();
 
     const makeCell = (txt, cls = 'cell') => {
@@ -43,7 +43,11 @@
       }
     }
 
-    container.appendChild(frag);
+    // Separate the scrollport from the grid so its end padding is scrollable.
+    const grid = document.createElement('div');
+    grid.className = 'matrix-grid';
+    grid.appendChild(frag);
+    container.appendChild(grid);
   }
 
   // すべてのハイライトをクリア
@@ -59,8 +63,8 @@
   // @param {HTMLElement} container - 表のコンテナー
   // @param {number} rowIndex - 行インデックス（鍵文字）
   // @param {number} colIndex - 列インデックス（平文/暗号文字）
-  function highlight(container, { rowIndex, colIndex, cellIndex }) {
-    const children = container.children;
+  function highlight(container, { rowIndex, colIndex }) {
+    const children = container.querySelector('.matrix-grid').children;
     const rowStart = 27 + rowIndex * 27;
 
     // 行全体をハイライト（行ヘッダーを含む）
@@ -77,13 +81,17 @@
     // 交点セルをハイライト
     const cellPos = rowStart + (colIndex + 1);
     children[cellPos]?.classList.add('hi-cell');
-  }
-
-  // セル内の文字を更新（オプション機能）
-  function setCellLetter(container, letterAt, rowIndex, colIndex, letter) {
-    const cellPos = 1 + (rowIndex + 1) * 27 + (colIndex + 1);
-    const div = container.children[cellPos];
-    if (div) div.textContent = letter;
+    const cell = children[cellPos];
+    if (cell) {
+      const target = cell.getBoundingClientRect();
+      const frame = container.getBoundingClientRect();
+      if (target.top < frame.top + 44 || target.bottom > frame.bottom) {
+        container.scrollTop += target.top - frame.top - container.clientHeight / 2;
+      }
+      if (target.left < frame.left + 32 || target.right > frame.right) {
+        container.scrollLeft += target.left - frame.left - container.clientWidth / 2;
+      }
+    }
   }
 
   // ステップテーブルに行を追加
@@ -103,5 +111,5 @@
     if (wrap) wrap.scrollTop = wrap.scrollHeight;
   }
 
-  global.Viz = { buildMatrix, clearHighlights, highlight, setCellLetter, addStepRow };
+  global.Viz = { buildMatrix, clearHighlights, highlight, addStepRow };
 })(window);
