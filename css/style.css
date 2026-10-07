@@ -301,3 +301,8 @@ footer .footer {
 .table-pages { margin-block: .75rem; }
 .table-pages p { flex-basis: 100%; margin: 0; }
 button:disabled { cursor: default; opacity: .55; }
+.current-step td { border-bottom: 2px solid var(--primary); font-weight: 700; }
+.diff-context { padding: .5rem; line-height: 2.4; overflow-wrap: anywhere; unicode-bidi: isolate; }
+.diff-context span { unicode-bidi: isolate; }
+.diff-character { border: 2px solid var(--primary); border-radius: .25rem; padding: .2rem; margin-inline: .2rem; }
+.diff-special { font-size: .875rem; }

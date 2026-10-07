@@ -102,8 +102,15 @@ Four main tabs in `index.html`:
 - `Ctrl+Enter`: Bulk encrypt/decrypt on active tab
 - `Space`: Play/pause animation
 - `→`: Step forward one character
+- `←`: Step back one character (outside interactive controls)
 - `Esc`: Reset to beginning (or close help modal)
 - `?`: Show keyboard shortcuts help
+
+Use a single Go to start button (the existing ResetBtn ID). Clear removes input.
+Manual trace-page changes scroll to the top; stepping follows the current row.
+At the end, disable next/play until the user goes back or changes input.
+Measure bulk time before normalization/calculation. Show difference characters
+with an outline and named whitespace/control characters using textContent only.
 
 ## Code Conventions
 

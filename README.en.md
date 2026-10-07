@@ -259,13 +259,17 @@ Use “Previous character”, “Go to start” and “Go to position” to sele
 Positions count processed characters after normalization; 0 is the start.
 Step tables use 300-row pages; changing the displayed page does not change the output or calculation position.
 Going back, selecting a position or changing pages pauses playback.
+Manual page changes show the first row; stepping follows the current row.
+At the end, Next character and playback are disabled; going back enables them again.
+Go to start retains input and returns progress to 0; Clear removes input and results.
 
 “Decrypt with the same key/settings and compare” encrypts all plaintext, replaces the Decrypt input, key and settings, then decrypts it.
 The comparison target is normalized plaintext.
 The original input, expected text and decrypted result are displayed together.
 Change the decryption key or settings and run again to see the first differing position and up to eight characters on each side.
-Context uses JSON string notation: `\n` indicates a line break and `\t` a tab.
-`→ [character] ←` marks the difference; `<end of text>` means no character is present.
+Context outlines the first differing character.
+Spaces, line breaks and tabs are named; an absent character is labeled “End of text”.
+Control characters, including direction controls, are shown as names with their character codes.
 Changing encryption input or settings clears the comparison target; incomplete decryption is not classified as a match.
 This does not restore original spelling or removed characters, and a match proves neither security nor the absence of tampering.
 
@@ -296,14 +300,15 @@ This does not restore original spelling or removed characters, and a match prove
 - Key alignment shows the first 300 rows; step tables show processed rows in 300-row pages with previous/next navigation. The full result is not truncated
 - Animation delay: slow 250ms, normal 120ms, fast 60ms; processing time affects the actual interval
 - Bulk and step execution use the same calculated trace
+- Completion time: elapsed time including input normalization, cipher calculation and DOM updates
 
 ### UI/UX
 
 - Japanese/English and light/dark switches
 - Tabs: Left/Right arrows, Home, and End; Tab moves to controls
 - `Ctrl+Enter` / `Command+Enter`: process all text in the active Encrypt or Decrypt tab
-- `Space`: play/pause; `→`: next character (when focus is not in a field, button, or other interactive control)
-- `Esc`: close help; if help is closed, reset the active Encrypt or Decrypt tab
+- `Space`: play/pause; `→`: next character; `←`: previous character (when focus is not in a field, button, or other interactive control)
+- `Esc`: close help; if help is closed, return the active Encrypt or Decrypt tab to the start
 - `?`: open help (when focus is not in a field, button, or other interactive control)
 - Copy failure is reported; the result can be selected and copied manually
 

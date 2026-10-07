@@ -25,10 +25,19 @@
       at: chars[i] ?? null, after: chars.slice(i + 1, i + 9).join('') });
     return { equal: false, position: i + 1, expected: context(a), actual: context(b) };
   }
+  function displayTokens(text) {
+    const names = { ' ': 'space', '\n': 'lineBreak', '\r': 'carriageReturn', '\t': 'tabChar', '\u00a0': 'noBreakSpace', '\u3000': 'wideSpace' };
+    return Array.from(text, ch => {
+      const code = 'U+' + ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0');
+      if (names[ch]) return { kind: names[ch], code };
+      if (/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(ch)) return { kind: 'controlChar', code };
+      return { kind: 'text', text: ch };
+    });
+  }
   const samples = [
     { id: 'aca', text: 'CEQUALSKMINUSP', key: 'RECIPROCAL', upper: true, nonAlpha: 'keep', skipOnNonAlpha: true, expected: 'PAMOPGWSODEKKT' },
     { id: 'wrap', text: 'Z A', key: 'BC', upper: true, nonAlpha: 'keep', skipOnNonAlpha: true, expected: 'C C' },
     { id: 'normalize', text: 'Ａb c!🙂', key: 'ＢＣ', upper: true, nonAlpha: 'drop', skipOnNonAlpha: true, expected: 'BBZ' }
   ];
-  global.Learning = { preview, windowFor, compare, samples, PAGE_SIZE };
+  global.Learning = { preview, windowFor, compare, displayTokens, samples, PAGE_SIZE };
 })(window);
