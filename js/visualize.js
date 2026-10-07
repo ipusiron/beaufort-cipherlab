@@ -6,7 +6,7 @@
   // - 0列目: ヘッダー列（行ヘッダー）
   // - 行i、列jのセル = (i - j) mod 26
   function buildMatrix(container) {
-    container.innerHTML = '';
+    container.textContent = '';
     const frag = document.createDocumentFragment();
 
     const makeCell = (txt, cls = 'cell') => {

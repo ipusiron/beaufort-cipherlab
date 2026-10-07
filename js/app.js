@@ -118,7 +118,7 @@
     kg.expanded.value = expandedKey;
 
     // 位置対応テーブルを構築
-    kg.table.innerHTML = '';
+    kg.table.textContent = '';
     const L = Math.min(300, Math.max(length, chars.length));
     for (let i = 0; i < L; i++) {
       const tr = document.createElement('tr');
@@ -142,7 +142,7 @@
     kg.keyword.value = '';
     kg.plain.value = '';
     kg.expanded.value = '';
-    kg.table.innerHTML = '';
+    kg.table.textContent = '';
   });
 
   // ===== 暗号化/復号共通ヘルパー =====
@@ -255,7 +255,7 @@
   function encReset() {
     encStop();
     enc.out.value = '';
-    enc.stepsBody.innerHTML = '';
+    enc.stepsBody.textContent = '';
     Viz.clearHighlights(enc.matrix);
     const valid = prepare(encState, 'enc', enc.plain.value, enc.key.value);
     updateEncProgress();
@@ -397,7 +397,7 @@
   function decReset() {
     decStop();
     dec.out.value = '';
-    dec.stepsBody.innerHTML = '';
+    dec.stepsBody.textContent = '';
     Viz.clearHighlights(dec.matrix);
     const valid = prepare(decState, 'dec', dec.cipher.value, dec.key.value);
     updateDecProgress();
@@ -519,7 +519,7 @@
     (prefix === 'enc' ? encStop : decStop)();
     Object.assign(state, { i: 0, input: [], key: '', opts: null, steps: [], output: '' });
     panel.out.value = '';
-    panel.stepsBody.innerHTML = '';
+    panel.stepsBody.textContent = '';
     Viz.clearHighlights(panel.matrix);
     (prefix === 'enc' ? updateEncProgress : updateDecProgress)();
   }
@@ -532,8 +532,8 @@
     input.addEventListener('change', () => invalidate(prefix));
   }
   for (const input of [kg.keyword, kg.plain, kg.repeat, kg.skipNonAlpha, kg.upper, kg.nonAlpha]) {
-    input.addEventListener('input', () => { kg.expanded.value = ''; kg.table.innerHTML = ''; });
-    input.addEventListener('change', () => { kg.expanded.value = ''; kg.table.innerHTML = ''; });
+    input.addEventListener('input', () => { kg.expanded.value = ''; kg.table.textContent = ''; });
+    input.addEventListener('change', () => { kg.expanded.value = ''; kg.table.textContent = ''; });
   }
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { encStop(); decStop(); }
