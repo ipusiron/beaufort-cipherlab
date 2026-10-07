@@ -285,3 +285,19 @@ footer .footer {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; }
 }
+
+/* Learning controls: single-column layout, wrapping actions and bounded output. */
+.learning-box {
+  margin-block: 1rem; padding: .75rem; border: 1px solid var(--border);
+  border-radius: .75rem; background: var(--surface); min-width: 0;
+}
+.learning-box summary { cursor: pointer; min-height: 2.75rem; }
+.learning-box p { font-size: .875rem; line-height: 1.6; overflow-wrap: anywhere; }
+.learning-box label { margin-top: .75rem; }
+.learning-box pre { white-space: pre-wrap; overflow-wrap: anywhere; unicode-bidi: plaintext; }
+.learning-box textarea { unicode-bidi: plaintext; }
+.learning-box input[type="number"] { width: 8rem; min-height: 2.75rem; }
+.learning-box .actions, .table-pages { flex-wrap: wrap; }
+.table-pages { margin-block: .75rem; }
+.table-pages p { flex-basis: 100%; margin: 0; }
+button:disabled { cursor: default; opacity: .55; }

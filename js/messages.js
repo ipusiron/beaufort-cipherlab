@@ -35,8 +35,8 @@
     ['例: NAVY', 'Example: NAVY'], ['展開長の参考に使います（未入力でもOK）', 'Used for alignment; may be left empty'],
     ['鍵生成タブの鍵文字列を取得', 'Use the expanded key from Key expansion'],
     ['暗号化タブの暗号文を取得', 'Use the result from Encrypt'],
-    ['入力は各欄10,000文字まで。対応表と手順表は先頭300行、結果は全文です。',
-      'Up to 10,000 characters per field. Alignment and step tables show the first 300 rows; results include the full text.'],
+    ['入力は各欄10,000文字まで。鍵の対応表は先頭300行、手順表は300行ごとに表示します。結果は全文です。',
+      'Up to 10,000 characters per field. Key alignment shows the first 300 rows; step tables use 300-row pages. Results include the full text.'],
     ['全角英字は半角に変換します。大文字化OFFでは英字の大小を保ちます。非英字は暗号化しません。',
       'Fullwidth Latin letters are converted to ASCII. With uppercase conversion off, letter case is preserved. Non-letters are not encrypted.'],
     ['入力や設定を変えると結果と進行を消します。同期するのは欄の文字列だけで、設定は移しません。',
@@ -48,6 +48,41 @@
     ['Main Tabs', 'Main Tabs'], ['Toggle theme', 'Toggle theme'], ['Show keyboard shortcuts', 'Show keyboard shortcuts'], ['Close', 'Close']
   ];
   const dynamic = {
+    preview: ['処理前の確認（正規化）', 'Input preview (normalization)'],
+    normalized: ['実際に処理する文字列', 'Text used for processing'],
+    normalizedKey: ['実際に使う鍵', 'Key used for processing'],
+    normalizationCounts: ['処理対象 {count}文字／全角英字→半角 {width}文字／小文字→大文字 {upper}文字／除去 {removed}文字', 'Processed text: {count} characters / width conversions: {width} / uppercase conversions: {upper} / removed: {removed}'],
+    normalizationNote: ['変換数は重複します。変換・除去した文字は、復号しても原文の表記には戻りません。空白・改行も文字数に含みます。', 'Conversion counts may overlap. Decryption does not restore original spelling or removed characters. Spaces and line breaks count as characters.'],
+    back: ['← 1文字戻る', '← Previous character'],
+    first: ['先頭へ戻る', 'Go to start'],
+    jumpLabel: ['処理済み文字数（0＝先頭）', 'Processed characters (0 = start)'],
+    jump: ['指定位置へ移動', 'Go to position'],
+    invalidPosition: ['0から{total}までの整数を指定してください', 'Enter an integer from 0 to {total}.'],
+    pagePrev: ['前の300行', 'Previous 300 rows'],
+    pageNext: ['次の300行', 'Next 300 rows'],
+    rows: ['表示行: {start}–{end}／処理済み {done}文字', 'Rows: {start}–{end} / {done} characters processed'],
+    noRows: ['処理済みの行はありません', 'No processed rows yet.'],
+    roundTrip: ['同じ鍵・設定で復号して照合', 'Decrypt with the same key/settings and compare'],
+    roundTripNote: ['暗号化を最後まで実行し、復号タブの入力・鍵・設定を置き換えます。照合対象は正規化後の平文です。一致しても安全性や改ざんがないことの証明にはなりません。', 'Processes all plaintext and replaces the Decrypt input, key and settings. Comparison uses normalized plaintext. A match does not prove security or the absence of tampering.'],
+    comparison: ['暗号化前との照合', 'Comparison with the encryption input'],
+    original: ['入力原文', 'Original input'],
+    expected: ['正規化後の平文（比較対象）', 'Normalized plaintext (expected)'],
+    actual: ['復号結果', 'Decrypted text'],
+    match: ['一致: 正規化後の平文 {count}文字に戻りました', 'Match: recovered all {count} characters of normalized plaintext.'],
+    mismatch: ['不一致: 最初の相違は{position}文字目です（コードポイント単位）', 'Mismatch: first difference at character {position} (counted by code point).'],
+    pending: ['復号を最後まで実行すると照合できます', 'Complete decryption to compare.'],
+    noComparison: ['暗号化タブの「同じ鍵・設定で復号して照合」から開始してください', 'Start with “Decrypt with the same key/settings and compare” in Encrypt.'],
+    contextExpected: ['比較対象の前後', 'Expected context'],
+    contextActual: ['復号結果の前後', 'Decrypted context'],
+    endOfText: ['〈末尾〉', '<end of text>'],
+    samples: ['学習用サンプル（平文・鍵・設定を置換）', 'Learning samples (replace plaintext, key and settings)'],
+    sample_aca: ['基本例（ACA）', 'Basic example (ACA)'],
+    sample_wrap: ['折り返しと空白', 'Wraparound and spaces'],
+    sample_normalize: ['全角・小文字・記号', 'Fullwidth, lowercase and symbols'],
+    sampleHint_aca: ['ACAの既知例。暗号文は PAMOPGWSODEKKT です。', 'ACA known-answer example. Expected ciphertext: PAMOPGWSODEKKT.'],
+    sampleHint_wrap: ['Zと鍵Bは (1−25) mod 26 = 2 → C。空白で鍵を進める設定も試せます。', 'Z with key B gives (1−25) mod 26 = 2 → C. Try advancing the key at spaces too.'],
+    sampleHint_normalize: ['処理対象は ABC、鍵は BC、暗号文は BBZ。除去と大文字化の設定を変えて比較できます。', 'Processed text: ABC; key: BC; ciphertext: BBZ. Compare different removal and uppercase settings.'],
+    sampleSource: ['ACAの出典', 'ACA source'],
     invalidKey: ['鍵に英字が含まれていません', 'The key contains no Latin letters.'],
     inputTooLong: ['入力は各欄10,000文字以内にしてください', 'Limit each field to 10,000 characters.'],
     expanded: ['鍵文字列に展開しました', 'Key expanded.'],
@@ -78,6 +113,7 @@
     const column = language === 'ja' ? 0 : 1;
     for (const [node, pair] of nodes) node.textContent = pair[column];
     for (const [element, attribute, pair] of attrs) element.setAttribute(attribute, pair[column]);
+    for (const element of document.querySelectorAll('[data-message]')) element.textContent = t(element.dataset.message);
     document.documentElement.lang = language;
     document.querySelector('#languageToggle').textContent = t('language');
     const readmeLink = document.querySelector('#readmeLink');

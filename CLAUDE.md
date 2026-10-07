@@ -10,8 +10,13 @@
   uppercase conversion is off. Only ASCII letters are cipher symbols.
 - Count text by Unicode code points, not UTF-16 code units. Non-letter removal
   happens before key advancement. Keep-spaces means U+0020 only.
-- Limit each input to 10,000 code points. Show at most 300 table rows, but never
+- Limit each input to 10,000 code points. Key alignment shows the first 300 rows;
+  step tables page through completed rows in windows of at most 300. Never
   truncate the result. Reject oversized input explicitly.
+- `learning.js` owns normalization previews, code-point comparison, trace windows
+  and samples. Comparison uses normalized plaintext, not the original spelling.
+  Editing encryption input/settings clears the comparison baseline; editing the
+  decryption side retains it but clears the comparison result until completion.
 - Input, setting, sync, and clear operations invalidate the corresponding result
   and playback state. Tab/language changes and page hiding stop playback.
 - `preferences.js` runs before CSS; `messages.js` owns Japanese/English text.

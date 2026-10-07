@@ -5,6 +5,8 @@
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
   const t = Messages.t;
+  let comparisonSource = null;
+  let activeSample = null;
 
   // ===== テーマ切替 =====
   const themeToggle = $('#themeToggle');
@@ -143,6 +145,7 @@
     kg.plain.value = '';
     kg.expanded.value = '';
     kg.table.textContent = '';
+    updatePreview('kg');
   });
 
   // ===== 暗号化/復号共通ヘルパー =====
@@ -219,14 +222,43 @@
     }
   }
 
-  function renderStep(panel, step) {
+  function highlightStep(panel, step) {
     Viz.clearHighlights(panel.matrix);
-    if (step.raw) {
+    if (step?.raw) {
       Viz.highlight(panel.matrix, { rowIndex: step.raw.k, colIndex: Norm.idx(step.inCh) });
     }
-    if (step.i < 300) Viz.addStepRow(panel.stepsBody, [
+  }
+
+  function renderRows(prefix) {
+    const panel = prefix === 'enc' ? enc : dec;
+    const state = prefix === 'enc' ? encState : decState;
+    const start = state.pageStart || 0;
+    const end = Math.min(start + Learning.PAGE_SIZE, state.i);
+    panel.stepsBody.textContent = '';
+    for (const step of state.steps.slice(start, end)) Viz.addStepRow(panel.stepsBody, [
       String(step.i + 1), step.inCh, step.keyCh, step.formula, step.numeric, step.outCh
     ]);
+    const range = $(`#${prefix}Rows`);
+    if (range) {
+      range.textContent = state.i ? t('rows', { start: start + 1, end, done: state.i }) : t('noRows');
+      $(`#${prefix}PagePrev`).disabled = start === 0;
+      $(`#${prefix}PageNext`).disabled = end >= state.i;
+    }
+  }
+
+  function renderPosition(prefix, position) {
+    const panel = prefix === 'enc' ? enc : dec;
+    const state = prefix === 'enc' ? encState : decState;
+    state.i = position;
+    state.pageStart = Learning.windowFor(position).start;
+    panel.out.value = state.steps.slice(0, position).map(step => step.outCh).join('');
+    highlightStep(panel, state.steps[position - 1]);
+    renderRows(prefix);
+    (prefix === 'enc' ? updateEncProgress : updateDecProgress)();
+    $(`#${prefix}Position`).value = position;
+    $(`#${prefix}Position`).max = state.input.length;
+    $(`#${prefix}BackBtn`).disabled = position === 0;
+    if (prefix === 'dec') renderComparison();
   }
 
   // ===== 暗号化タブ =====
@@ -258,7 +290,7 @@
     enc.stepsBody.textContent = '';
     Viz.clearHighlights(enc.matrix);
     const valid = prepare(encState, 'enc', enc.plain.value, enc.key.value);
-    updateEncProgress();
+    renderPosition('enc', 0);
     return valid;
   }
 
@@ -269,12 +301,7 @@
       return false;
     }
 
-    const step = encState.steps[encState.i];
-    enc.out.value += step.outCh;
-    renderStep(enc, step);
-
-    encState.i++;
-    updateEncProgress();
+    renderPosition('enc', encState.i + 1);
     return encState.i < encState.input.length;
   }
 
@@ -303,10 +330,7 @@
   enc.runBtn.addEventListener('click', () => {
     if (!encReset()) return;
     const startTime = performance.now();
-    const steps = encState.steps;
-    for (const step of steps.slice(0, 300)) renderStep(enc, step);
-    if (steps.length > 300) renderStep(enc, steps[steps.length - 1]);
-    enc.out.value = encState.output;
+    renderPosition('enc', encState.input.length);
     const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
     encState.i = encState.input.length;
     updateEncProgress();
@@ -315,6 +339,7 @@
 
   // 次の1文字ボタン
   enc.stepBtn.addEventListener('click', () => {
+    encStop();
     if (encState.i === 0) {
       if (!encReset()) return;
     }
@@ -400,7 +425,7 @@
     dec.stepsBody.textContent = '';
     Viz.clearHighlights(dec.matrix);
     const valid = prepare(decState, 'dec', dec.cipher.value, dec.key.value);
-    updateDecProgress();
+    renderPosition('dec', 0);
     return valid;
   }
 
@@ -411,12 +436,7 @@
       return false;
     }
 
-    const step = decState.steps[decState.i];
-    dec.out.value += step.outCh;
-    renderStep(dec, step);
-
-    decState.i++;
-    updateDecProgress();
+    renderPosition('dec', decState.i + 1);
     return decState.i < decState.input.length;
   }
 
@@ -445,10 +465,7 @@
   dec.runBtn.addEventListener('click', () => {
     if (!decReset()) return;
     const startTime = performance.now();
-    const steps = decState.steps;
-    for (const step of steps.slice(0, 300)) renderStep(dec, step);
-    if (steps.length > 300) renderStep(dec, steps[steps.length - 1]);
-    dec.out.value = decState.output;
+    renderPosition('dec', decState.input.length);
     const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
     decState.i = decState.input.length;
     updateDecProgress();
@@ -457,6 +474,7 @@
 
   // 次の1文字ボタン
   dec.stepBtn.addEventListener('click', () => {
+    decStop();
     if (decState.i === 0) {
       if (!decReset()) return;
     }
@@ -510,6 +528,7 @@
     decStop();
     dec.cipher.value = '';
     dec.key.value = '';
+    comparisonSource = null;
     invalidate('dec');
   });
 
@@ -521,7 +540,14 @@
     panel.out.value = '';
     panel.stepsBody.textContent = '';
     Viz.clearHighlights(panel.matrix);
-    (prefix === 'enc' ? updateEncProgress : updateDecProgress)();
+    if (prefix === 'enc') {
+      comparisonSource = null;
+      activeSample = null;
+      $('#sampleHint').textContent = '';
+    }
+    renderPosition(prefix, 0);
+    updatePreview(prefix);
+    renderComparison();
   }
 
   for (const [prefix, inputs] of [
@@ -532,8 +558,8 @@
     input.addEventListener('change', () => invalidate(prefix));
   }
   for (const input of [kg.keyword, kg.plain, kg.repeat, kg.skipNonAlpha, kg.upper, kg.nonAlpha]) {
-    input.addEventListener('input', () => { kg.expanded.value = ''; kg.table.textContent = ''; });
-    input.addEventListener('change', () => { kg.expanded.value = ''; kg.table.textContent = ''; });
+    input.addEventListener('input', () => { kg.expanded.value = ''; kg.table.textContent = ''; updatePreview('kg'); });
+    input.addEventListener('change', () => { kg.expanded.value = ''; kg.table.textContent = ''; updatePreview('kg'); });
   }
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { encStop(); decStop(); }
@@ -549,6 +575,161 @@
     }
   }
 
+  // Build learning controls without parsing HTML or interpolating user text.
+  function element(tag, parent, id, message) {
+    const node = document.createElement(tag);
+    if (id) node.id = id;
+    if (message) { node.dataset.message = message; node.textContent = t(message); }
+    parent.appendChild(node);
+    return node;
+  }
+  function button(parent, id, message, handler) {
+    const node = element('button', parent, id, message);
+    node.type = 'button'; node.className = 'btn';
+    node.addEventListener('click', handler);
+    return node;
+  }
+  function readonlyField(parent, id, message) {
+    element('label', parent, null, message).htmlFor = id;
+    const node = element('textarea', parent, id);
+    node.readOnly = true; node.rows = 2;
+    return node;
+  }
+  function updatePreview(prefix) {
+    const text = prefix === 'kg' ? kg.plain.value : prefix === 'enc' ? enc.plain.value : dec.cipher.value;
+    const key = prefix === 'kg' ? kg.keyword.value : prefix === 'enc' ? enc.key.value : dec.key.value;
+    try {
+      const info = Learning.preview(text, key, getEncOpts(prefix));
+      $(`#${prefix}Normalized`).value = info.normalized;
+      $(`#${prefix}NormalizedKey`).value = info.key;
+      $(`#${prefix}NormalizationCounts`).textContent = t('normalizationCounts', info);
+    } catch {
+      $(`#${prefix}Normalized`).value = '';
+      $(`#${prefix}NormalizedKey`).value = '';
+      $(`#${prefix}NormalizationCounts`).textContent = t('inputTooLong');
+    }
+  }
+  for (const prefix of ['kg', 'enc', 'dec']) {
+    const anchor = $(`#${prefix}Upper`).closest('.options');
+    const preview = document.createElement('details');
+    preview.className = 'learning-box'; preview.open = true;
+    anchor.after(preview);
+    element('summary', preview, null, 'preview');
+    readonlyField(preview, `${prefix}Normalized`, 'normalized');
+    readonlyField(preview, `${prefix}NormalizedKey`, 'normalizedKey');
+    element('p', preview, `${prefix}NormalizationCounts`);
+    element('p', preview, null, 'normalizationNote');
+  }
+  for (const prefix of ['enc', 'dec']) {
+    const panel = prefix === 'enc' ? enc : dec;
+    const state = prefix === 'enc' ? encState : decState;
+    const reset = prefix === 'enc' ? encReset : decReset;
+    const stop = prefix === 'enc' ? encStop : decStop;
+    const nav = document.createElement('div'); nav.className = 'learning-box';
+    $(`#${prefix}Progress`).before(nav);
+    const actions = element('div', nav); actions.className = 'actions';
+    button(actions, `${prefix}BackBtn`, 'back', () => { stop(); renderPosition(prefix, Math.max(0, state.i - 1)); });
+    button(actions, `${prefix}FirstBtn`, 'first', () => { reset(); });
+    element('label', nav, null, 'jumpLabel').htmlFor = `${prefix}Position`;
+    const jumpRow = element('div', nav); jumpRow.className = 'actions';
+    const input = element('input', jumpRow, `${prefix}Position`);
+    input.type = 'number'; input.min = 0; input.max = 10000; input.step = 1; input.value = 0;
+    const go = () => {
+      stop();
+      const value = input.value.trim();
+      const position = Number(value);
+      if (!state.opts && !reset()) return;
+      if (!value || !Number.isInteger(position) || position < 0 || position > state.input.length) {
+        input.value = value;
+        Toast.show(t('invalidPosition', { total: state.input.length })); return;
+      }
+      renderPosition(prefix, position);
+    };
+    button(jumpRow, `${prefix}JumpBtn`, 'jump', go);
+    input.addEventListener('keydown', event => {
+      if (event.key === 'Enter' && !event.ctrlKey && !event.metaKey && !event.isComposing) { event.preventDefault(); go(); }
+    });
+    const pages = document.createElement('div'); pages.className = 'actions table-pages';
+    panel.stepsBody.closest('.table-wrap').before(pages);
+    button(pages, `${prefix}PagePrev`, 'pagePrev', () => {
+      stop(); state.pageStart = Math.max(0, (state.pageStart || 0) - Learning.PAGE_SIZE); renderRows(prefix);
+    });
+    button(pages, `${prefix}PageNext`, 'pageNext', () => {
+      stop(); state.pageStart = Math.min(Learning.windowFor(state.i).start, (state.pageStart || 0) + Learning.PAGE_SIZE); renderRows(prefix);
+    });
+    element('p', pages, `${prefix}Rows`).setAttribute('aria-live', 'polite');
+  }
+
+  const sampleBox = document.createElement('details'); sampleBox.className = 'learning-box';
+  $('[for="encPlain"]').before(sampleBox);
+  element('summary', sampleBox, null, 'samples');
+  const sampleButtons = element('div', sampleBox); sampleButtons.className = 'actions';
+  for (const sample of Learning.samples) button(sampleButtons, `sample-${sample.id}`, `sample_${sample.id}`, () => {
+    enc.plain.value = sample.text; enc.key.value = sample.key;
+    enc.upper.checked = sample.upper; enc.nonAlpha.value = sample.nonAlpha; enc.skipNonAlpha.checked = sample.skipOnNonAlpha;
+    invalidate('enc');
+    activeSample = sample.id;
+    $('#sampleHint').textContent = t(`sampleHint_${activeSample}`);
+  });
+  element('p', sampleBox, 'sampleHint');
+  const source = element('a', sampleBox, null, 'sampleSource');
+  source.href = 'https://www.cryptogram.org/downloads/aca.info/ciphers/Beaufort.pdf';
+  source.target = '_blank'; source.rel = 'noopener noreferrer';
+
+  const roundTrip = document.createElement('div'); roundTrip.className = 'learning-box';
+  enc.out.parentElement.appendChild(roundTrip);
+  button(roundTrip, 'roundTripBtn', 'roundTrip', () => {
+    if (!encReset()) return;
+    renderPosition('enc', encState.input.length);
+    dec.cipher.value = encState.output; dec.key.value = enc.key.value;
+    dec.upper.checked = enc.upper.checked; dec.nonAlpha.value = enc.nonAlpha.value; dec.skipNonAlpha.checked = enc.skipNonAlpha.checked;
+    invalidate('dec');
+    comparisonSource = { original: enc.plain.value, expected: encState.input.join('') };
+    if (!decReset()) return;
+    renderPosition('dec', decState.input.length);
+    $('[data-tab="tab-decrypt"]').click();
+  });
+  element('p', roundTrip, null, 'roundTripNote');
+  const comparison = document.createElement('section'); comparison.className = 'learning-box';
+  dec.out.parentElement.appendChild(comparison);
+  element('h3', comparison, null, 'comparison');
+  element('p', comparison, 'comparisonStatus').setAttribute('role', 'status');
+  const comparisonDetails = element('div', comparison, 'comparisonDetails');
+  readonlyField(comparisonDetails, 'comparisonOriginal', 'original');
+  readonlyField(comparisonDetails, 'comparisonExpected', 'expected');
+  readonlyField(comparisonDetails, 'comparisonActual', 'actual');
+  const difference = element('div', comparisonDetails, 'comparisonDifference');
+  for (const [id, label] of [['Expected', 'contextExpected'], ['Actual', 'contextActual']]) {
+    element('p', difference, null, label);
+    element('pre', difference, `context${id}`);
+  }
+  element('p', comparison, null, 'normalizationNote');
+  element('p', comparison, null, 'roundTripNote');
+
+  function renderComparison() {
+    const status = $('#comparisonStatus');
+    if (!status) return;
+    $('#comparisonDetails').hidden = !comparisonSource;
+    $('#comparisonDifference').hidden = true;
+    for (const id of ['comparisonOriginal', 'comparisonExpected', 'comparisonActual']) $('#' + id).value = '';
+    for (const id of ['contextExpected', 'contextActual']) $('#' + id).textContent = '';
+    if (!comparisonSource) { status.textContent = t('noComparison'); return; }
+    $('#comparisonOriginal').value = comparisonSource.original;
+    $('#comparisonExpected').value = comparisonSource.expected;
+    if (!decState.opts || !decState.key || decState.i !== decState.input.length) { status.textContent = t('pending'); return; }
+    $('#comparisonActual').value = dec.out.value;
+    const result = Learning.compare(comparisonSource.expected, dec.out.value);
+    status.textContent = t(result.equal ? 'match' : 'mismatch', result);
+    if (!result.equal) {
+      $('#comparisonDifference').hidden = false;
+      for (const [id, part] of [['Expected', result.expected], ['Actual', result.actual]]) {
+        // JSON notation makes whitespace/control characters and literal brackets unambiguous.
+        $(`#context${id}`).textContent = JSON.stringify(part.before) + ' → [' +
+          (part.at === null ? t('endOfText') : JSON.stringify(part.at)) + '] ← ' + JSON.stringify(part.after);
+      }
+    }
+  }
+
   document.addEventListener('languagechange', () => {
     encStop(); decStop();
     updateEncProgress(); updateDecProgress(); updateThemeLabel();
@@ -560,7 +741,12 @@
     $('.tabs').setAttribute('aria-label', t('tabs'));
     helpToggle.setAttribute('aria-label', t('help'));
     helpClose.setAttribute('aria-label', t('close'));
+    for (const prefix of ['kg', 'enc', 'dec']) updatePreview(prefix);
+    for (const prefix of ['enc', 'dec']) renderRows(prefix);
+    renderComparison();
+    if (activeSample) $('#sampleHint').textContent = t(`sampleHint_${activeSample}`);
   });
+  renderPosition('enc', 0); renderPosition('dec', 0);
   Messages.init();
 
   // ===== キーボードショートカット =====
