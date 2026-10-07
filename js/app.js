@@ -229,15 +229,22 @@
     }
   }
 
-  function renderRows(prefix) {
+  function renderRows(prefix, scroll = 'preserve') {
     const panel = prefix === 'enc' ? enc : dec;
     const state = prefix === 'enc' ? encState : decState;
     const start = state.pageStart || 0;
     const end = Math.min(start + Learning.PAGE_SIZE, state.i);
+    const wrap = panel.stepsBody.closest('.table-wrap');
+    const previousScroll = wrap.scrollTop;
     panel.stepsBody.textContent = '';
     for (const step of state.steps.slice(start, end)) Viz.addStepRow(panel.stepsBody, [
       String(step.i + 1), step.inCh, step.keyCh, step.formula, step.numeric, step.outCh
     ]);
+    if (end === state.i && state.i > start) {
+      panel.stepsBody.lastElementChild.classList.add('current-step');
+      panel.stepsBody.lastElementChild.setAttribute('aria-current', 'step');
+    }
+    wrap.scrollTop = scroll === 'top' ? 0 : scroll === 'current' ? wrap.scrollHeight : previousScroll;
     const range = $(`#${prefix}Rows`);
     if (range) {
       range.textContent = state.i ? t('rows', { start: start + 1, end, done: state.i }) : t('noRows');
@@ -253,11 +260,14 @@
     state.pageStart = Learning.windowFor(position).start;
     panel.out.value = state.steps.slice(0, position).map(step => step.outCh).join('');
     highlightStep(panel, state.steps[position - 1]);
-    renderRows(prefix);
+    renderRows(prefix, 'current');
     (prefix === 'enc' ? updateEncProgress : updateDecProgress)();
     $(`#${prefix}Position`).value = position;
     $(`#${prefix}Position`).max = state.input.length;
     $(`#${prefix}BackBtn`).disabled = position === 0;
+    const complete = state.opts !== null && state.key.length > 0 && position === state.input.length;
+    panel.stepBtn.disabled = complete;
+    panel.playBtn.disabled = complete;
     if (prefix === 'dec') renderComparison();
   }
 
@@ -328,8 +338,8 @@
 
   // すべて暗号化ボタン（一括実行）
   enc.runBtn.addEventListener('click', () => {
-    if (!encReset()) return;
     const startTime = performance.now();
+    if (!encReset()) return;
     renderPosition('enc', encState.input.length);
     const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
     encState.i = encState.input.length;
@@ -463,8 +473,8 @@
 
   // すべて復号ボタン（一括実行）
   dec.runBtn.addEventListener('click', () => {
-    if (!decReset()) return;
     const startTime = performance.now();
+    if (!decReset()) return;
     renderPosition('dec', decState.input.length);
     const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
     decState.i = decState.input.length;
@@ -629,7 +639,6 @@
     $(`#${prefix}Progress`).before(nav);
     const actions = element('div', nav); actions.className = 'actions';
     button(actions, `${prefix}BackBtn`, 'back', () => { stop(); renderPosition(prefix, Math.max(0, state.i - 1)); });
-    button(actions, `${prefix}FirstBtn`, 'first', () => { reset(); });
     element('label', nav, null, 'jumpLabel').htmlFor = `${prefix}Position`;
     const jumpRow = element('div', nav); jumpRow.className = 'actions';
     const input = element('input', jumpRow, `${prefix}Position`);
@@ -652,10 +661,10 @@
     const pages = document.createElement('div'); pages.className = 'actions table-pages';
     panel.stepsBody.closest('.table-wrap').before(pages);
     button(pages, `${prefix}PagePrev`, 'pagePrev', () => {
-      stop(); state.pageStart = Math.max(0, (state.pageStart || 0) - Learning.PAGE_SIZE); renderRows(prefix);
+      stop(); state.pageStart = Math.max(0, (state.pageStart || 0) - Learning.PAGE_SIZE); renderRows(prefix, 'top');
     });
     button(pages, `${prefix}PageNext`, 'pageNext', () => {
-      stop(); state.pageStart = Math.min(Learning.windowFor(state.i).start, (state.pageStart || 0) + Learning.PAGE_SIZE); renderRows(prefix);
+      stop(); state.pageStart = Math.min(Learning.windowFor(state.i).start, (state.pageStart || 0) + Learning.PAGE_SIZE); renderRows(prefix, 'top');
     });
     element('p', pages, `${prefix}Rows`).setAttribute('aria-live', 'polite');
   }
@@ -701,10 +710,28 @@
   const difference = element('div', comparisonDetails, 'comparisonDifference');
   for (const [id, label] of [['Expected', 'contextExpected'], ['Actual', 'contextActual']]) {
     element('p', difference, null, label);
-    element('pre', difference, `context${id}`);
+    element('div', difference, `context${id}`).className = 'diff-context';
   }
-  element('p', comparison, null, 'normalizationNote');
-  element('p', comparison, null, 'roundTripNote');
+  element('p', difference, null, 'differenceGuide');
+  element('p', comparison, null, 'comparisonNote');
+
+  function renderContext(container, part) {
+    container.textContent = '';
+    const appendText = (parent, text) => {
+      for (const token of Learning.displayTokens(text)) {
+        const span = element('span', parent);
+        span.textContent = token.kind === 'text' ? token.text : t(token.kind, token);
+        if (token.kind !== 'text') span.className = 'diff-special';
+      }
+    };
+    appendText(container, part.before);
+    const current = element('strong', container);
+    current.className = 'diff-character';
+    current.setAttribute('aria-label', t('differentCharacter'));
+    if (part.at === null) current.textContent = t('endOfText');
+    else appendText(current, part.at);
+    appendText(container, part.after);
+  }
 
   function renderComparison() {
     const status = $('#comparisonStatus');
@@ -723,9 +750,7 @@
     if (!result.equal) {
       $('#comparisonDifference').hidden = false;
       for (const [id, part] of [['Expected', result.expected], ['Actual', result.actual]]) {
-        // JSON notation makes whitespace/control characters and literal brackets unambiguous.
-        $(`#context${id}`).textContent = JSON.stringify(part.before) + ' → [' +
-          (part.at === null ? t('endOfText') : JSON.stringify(part.at)) + '] ← ' + JSON.stringify(part.after);
+        renderContext($(`#context${id}`), part);
       }
     }
   }
@@ -769,10 +794,14 @@
       if (active === 'tab-encrypt') enc.playBtn.click();
       if (active === 'tab-decrypt') dec.playBtn.click();
     }
-    // →: 次の1文字
-    if (e.key === 'ArrowRight' && !document.activeElement.closest('input, textarea, select, button, a, summary, [contenteditable="true"]')) {
-      if (active === 'tab-encrypt') enc.stepBtn.click();
-      if (active === 'tab-decrypt') dec.stepBtn.click();
+    // Arrow keys navigate the trace only outside interactive controls.
+    if (['ArrowRight', 'ArrowLeft'].includes(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey &&
+        !document.activeElement.closest('input, textarea, select, button, a, summary, [contenteditable="true"]')) {
+      const prefix = active === 'tab-encrypt' ? 'enc' : active === 'tab-decrypt' ? 'dec' : null;
+      if (prefix) {
+        e.preventDefault();
+        $(`#${prefix}${e.key === 'ArrowLeft' ? 'Back' : 'Step'}Btn`).click();
+      }
     }
     // Esc: リセットまたはモーダルを閉じる
     if (e.key === 'Escape') {

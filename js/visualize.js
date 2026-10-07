@@ -106,9 +106,7 @@
     });
     tbody.appendChild(tr);
 
-    // 自動スクロール（最下部へ）
-    const wrap = tbody.closest('.table-wrap');
-    if (wrap) wrap.scrollTop = wrap.scrollHeight;
+    // The controller decides whether to follow the current row or show a page's top.
   }
 
   global.Viz = { buildMatrix, clearHighlights, highlight, addStepRow };

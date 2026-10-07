@@ -59,3 +59,10 @@ test('mismatched keys and key advancement produce a first difference', () => {
     assert.equal(Learning.compare(text,Beaufort.decrypt({text:encrypted,...opts}).output).equal,false);
   }
 });
+test('difference tokens name whitespace without exposing direction/control characters', () => {
+  const tokens = Learning.displayTokens('A \n\r\t\u00a0\u3000\u202e\u2028🙂<');
+  assert.deepEqual(Array.from(tokens, t => t.kind), ['text','space','lineBreak','carriageReturn','tabChar','noBreakSpace','wideSpace','controlChar','controlChar','text','text']);
+  assert.equal(tokens[7].code,'U+202E');
+  assert.equal(tokens[9].text,'🙂');
+  assert.equal(tokens[10].text,'<');
+});
