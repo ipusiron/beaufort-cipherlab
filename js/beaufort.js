@@ -17,7 +17,8 @@
     const formula = 'C = (K − P) mod 26';
     const numeric = `(${k} − ${p}) mod 26 = ${cVal}`;
 
-    return { out: Norm.chr(cVal), formula, numeric, raw: { p, k, c: cVal } };
+    const out = Norm.chr(cVal);
+    return { out: /^[a-z]$/.test(Pch) ? out.toLowerCase() : out, formula, numeric, raw: { p, k, c: cVal } };
   }
 
   // 1文字の復号を実行（Pure Beaufort Cipher）
@@ -36,7 +37,8 @@
     const formula = 'P = (K − C) mod 26';
     const numeric = `(${k} − ${c}) mod 26 = ${pVal}`;
 
-    return { out: Norm.chr(pVal), formula, numeric, raw: { p: pVal, k, c } };
+    const out = Norm.chr(pVal);
+    return { out: /^[a-z]$/.test(Cch) ? out.toLowerCase() : out, formula, numeric, raw: { p: pVal, k, c } };
   }
 
   // テキスト全体を処理（暗号化または復号）
@@ -49,17 +51,18 @@
   // @param {function} stepCb - 各ステップのコールバック関数
   // @returns {object} { input: 正規化された入力, output: 出力 }
   function processText({ text, key, nonAlpha = 'keep', upper = true, skipOnNonAlpha = true, forDecrypt = false, stepCb }) {
+    if (Array.from(text || '').length > 10000 || Array.from(key || '').length > 10000) {
+      throw new Error('inputTooLong');
+    }
     const inText = Norm.normalize(text, { upper, nonAlpha });
-    const keyNorm = key.toUpperCase().replace(/[^A-Z]/g, '');
-    if (!keyNorm.length) throw new Error('鍵に英字が含まれていません。');
-
-    const driving = inText;
-    const EXP = Norm.expandKey(keyNorm, inText.length, { skipOnNonAlpha }, driving);
+    const keyNorm = Norm.normalizeKey(key);
+    if (!keyNorm.length) throw new Error('invalidKey');
+    const chars = Array.from(inText);
 
     let out = '';
     let kIdx = 0;
-    for (let i = 0; i < inText.length; i++) {
-      const ch = inText[i];
+    for (let i = 0; i < chars.length; i++) {
+      const ch = chars[i];
       let kch = '·';
 
       if (Norm.isAlpha(ch)) {

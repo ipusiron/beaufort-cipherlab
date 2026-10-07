@@ -1,0 +1,6 @@
+{
+  "name": "beaufort-cipherlab",
+  "private": true,
+  "scripts": { "test": "node --test" },
+  "engines": { "node": ">=22" }
+}
