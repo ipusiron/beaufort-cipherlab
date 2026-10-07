@@ -7,7 +7,8 @@
   // ===== テーマ切替 =====
   const themeToggle = $('#themeToggle');
   const themeLabel = $('.theme-label');
-  const storedTheme = localStorage.getItem('beaufort.theme');
+  let storedTheme;
+  try { storedTheme = localStorage.getItem('beaufort.theme'); } catch { /* storage is optional */ }
   const isDark = storedTheme === 'dark';
   if (isDark) {
     document.documentElement.classList.add('dark');
@@ -16,7 +17,7 @@
   themeToggle?.addEventListener('click', () => {
     const isDark = document.documentElement.classList.toggle('dark');
     themeLabel.textContent = isDark ? 'Light' : 'Dark';
-    localStorage.setItem('beaufort.theme', isDark ? 'dark' : 'light');
+    try { localStorage.setItem('beaufort.theme', isDark ? 'dark' : 'light'); } catch { /* storage is optional */ }
   });
 
   // ===== ヘルプモーダル（キーボードショートカット）=====
@@ -36,6 +37,7 @@
   // ===== タブ切替 =====
   $$('.tab').forEach(btn => {
     btn.addEventListener('click', () => {
+      encStop(); decStop();
       $$('.tab').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       const id = btn.dataset.tab;
@@ -52,7 +54,6 @@
     skipNonAlpha: $('#kgSkipNonAlpha'),
     upper: $('#kgUpper'),
     nonAlpha: $('#kgNonAlpha'),
-    showVig: $('#kgShowVig'),
     expandBtn: $('#kgExpandBtn'),
     copyBtn: $('#kgCopyBtn'),
     clearBtn: $('#kgClearBtn'),
@@ -63,13 +64,19 @@
   // 鍵文字列に展開ボタン
   kg.expandBtn.addEventListener('click', () => {
     const keyword = kg.keyword.value;
-    if (!/[A-Za-z]/.test(keyword)) {
+    if (!Norm.normalizeKey(keyword)) {
       Toast.show('鍵キーワードに英字がありません');
       return;
     }
     const plain = kg.plain.value;
+    if (Array.from(plain).length > 10000 || Array.from(keyword).length > 10000) {
+      Toast.show('入力は各欄10,000文字以内にしてください');
+      return;
+    }
     const normPlain = Norm.normalize(plain, { upper: kg.upper.checked, nonAlpha: kg.nonAlpha.value });
-    const length = kg.repeat.checked ? normPlain.length || keyword.length : keyword.length;
+    const chars = Array.from(normPlain);
+    const keyLength = Norm.normalizeKey(keyword).length;
+    const length = kg.repeat.checked ? chars.length || keyLength : keyLength;
     const exp = Norm.expandKey(keyword, length, { skipOnNonAlpha: kg.skipNonAlpha.checked }, normPlain);
     const expandedKey = exp.expanded.replace(/·/g, '');
 
@@ -77,12 +84,12 @@
 
     // 位置対応テーブルを構築
     kg.table.innerHTML = '';
-    const L = Math.max(length, normPlain.length);
+    const L = Math.min(300, Math.max(length, chars.length));
     for (let i = 0; i < L; i++) {
       const tr = document.createElement('tr');
       const tdI = document.createElement('td'); tdI.textContent = (i + 1).toString();
-      const tdP = document.createElement('td'); tdP.textContent = normPlain[i] ?? '';
-      const tdK = document.createElement('td'); tdK.textContent = expandedKey[i] ?? '';
+      const tdP = document.createElement('td'); tdP.textContent = chars[i] ?? '';
+      const tdK = document.createElement('td'); tdK.textContent = exp.expanded[i] === '·' ? '' : (exp.expanded[i] ?? '');
       tr.append(tdI, tdP, tdK);
       kg.table.appendChild(tr);
     }
@@ -92,8 +99,7 @@
 
   // コピーボタン
   kg.copyBtn.addEventListener('click', async () => {
-    await navigator.clipboard.writeText(kg.expanded.value || '');
-    Toast.show('鍵文字列をコピーしました');
+    await copyText(kg.expanded.value || '');
   });
 
   // クリアボタン
@@ -123,6 +129,7 @@
       return;
     }
     enc.key.value = keyText;
+    invalidate('enc');
     Toast.show('鍵文字列を同期');
   });
   decSyncBtn?.addEventListener('click', () => {
@@ -132,6 +139,7 @@
       return;
     }
     dec.key.value = keyText;
+    invalidate('dec');
     Toast.show('鍵文字列を同期');
   });
   decSyncCipherBtn?.addEventListener('click', () => {
@@ -141,6 +149,7 @@
       return;
     }
     dec.cipher.value = cipherText;
+    invalidate('dec');
     Toast.show('暗号文を同期');
   });
 
@@ -152,6 +161,39 @@
     return { upper, nonAlpha, skipOnNonAlpha: skipNonAlpha };
   }
 
+  // Shared calculation: bulk and stepping consume the same immutable trace.
+  function prepare(state, prefix, text, key) {
+    state.i = 0;
+    state.input = '';
+    state.key = '';
+    state.steps = [];
+    state.output = '';
+    state.opts = getEncOpts(prefix);
+    try {
+      const result = Beaufort[prefix === 'enc' ? 'encrypt' : 'decrypt']({
+        text, key, ...state.opts, stepCb: step => state.steps.push(step)
+      });
+      state.input = Array.from(result.input);
+      state.key = Norm.normalizeKey(key);
+      state.output = result.output;
+      return true;
+    } catch (error) {
+      Toast.show(error.message === 'inputTooLong'
+        ? '入力は各欄10,000文字以内にしてください' : '鍵に英字が含まれていません');
+      return false;
+    }
+  }
+
+  function renderStep(panel, step) {
+    Viz.clearHighlights(panel.matrix);
+    if (step.raw) {
+      Viz.highlight(panel.matrix, { rowIndex: step.raw.k, colIndex: Norm.idx(step.inCh) });
+    }
+    if (step.i < 300) Viz.addStepRow(panel.stepsBody, [
+      String(step.i + 1), step.inCh, step.keyCh, step.formula, step.numeric, step.outCh
+    ]);
+  }
+
   // ===== 暗号化タブ =====
   const enc = {
     plain: $('#encPlain'),
@@ -159,7 +201,6 @@
     nonAlpha: $('#encNonAlpha'),
     upper: $('#encUpper'),
     skipNonAlpha: $('#encSkipNonAlpha'),
-    showVig: $('#encShowVig'),
     speed: $('#encSpeed'),
     runBtn: $('#encRunBtn'),
     stepBtn: $('#encStepBtn'),
@@ -173,21 +214,17 @@
   };
 
   // 暗号化の状態管理
-  let encState = { i: 0, input: '', key: '', opts: null, playing: false, timer: null };
+  let encState = { i: 0, input: [], key: '', opts: null, steps: [], output: '', playing: false, timer: null };
 
   // 暗号化をリセット
   function encReset() {
-    encState.i = 0;
-    encState.input = Norm.normalize(enc.plain.value, { upper: enc.upper.checked, nonAlpha: enc.nonAlpha.value });
-    encState.key = enc.key.value.toUpperCase().replace(/[^A-Z]/g, '');
+    encStop();
     enc.out.value = '';
     enc.stepsBody.innerHTML = '';
     Viz.clearHighlights(enc.matrix);
-    if (!encState.key.length) {
-      Toast.show('鍵（鍵文字列）に英字が含まれていません');
-      return false;
-    }
-    return true;
+    const valid = prepare(encState, 'enc', enc.plain.value, enc.key.value);
+    updateEncProgress();
+    return valid;
   }
 
   // 1文字だけ暗号化を進める
@@ -197,37 +234,9 @@
       return false;
     }
 
-    const ch = encState.input[encState.i];
-    const opts = encState.opts;
-
-    // 鍵文字の進行を決定
-    let consumeKey = Norm.isAlpha(ch) || !opts.skipOnNonAlpha;
-    const keyIndex = countKeyConsumes(encState.input.slice(0, encState.i), opts.skipOnNonAlpha);
-    const kch = encState.key.length ? encState.key[keyIndex % encState.key.length] : '';
-
-    let step;
-    if (Norm.isAlpha(ch)) {
-      step = Beaufort.stepEncryptChar(ch, kch);
-      const row = Norm.idx(kch);
-      const col = Norm.idx(ch);
-      Viz.clearHighlights(enc.matrix);
-      Viz.highlight(enc.matrix, { rowIndex: row, colIndex: col });
-    } else {
-      step = { out: ch, formula: '', numeric: '', raw: null };
-      Viz.clearHighlights(enc.matrix);
-    }
-
-    enc.out.value += step.out;
-
-    const rowCells = [
-      (encState.i + 1).toString(),
-      ch,
-      Norm.isAlpha(ch) || !opts.skipOnNonAlpha ? (kch || '') : '',
-      step.formula,
-      step.numeric,
-      step.out
-    ];
-    Viz.addStepRow(enc.stepsBody, rowCells);
+    const step = encState.steps[encState.i];
+    enc.out.value += step.outCh;
+    renderStep(enc, step);
 
     encState.i++;
     updateEncProgress();
@@ -250,51 +259,19 @@
   // アニメーション停止
   function encStop() {
     encState.playing = false;
-    enc.playBtn.textContent = '再生 ▶';
+    enc.playBtn.textContent = '▶ アニメーション';
     if (encState.timer) clearTimeout(encState.timer);
     encState.timer = null;
   }
 
-  // 鍵が消費された回数をカウント
-  function countKeyConsumes(s, skipOnNonAlpha) {
-    let n = 0;
-    for (const ch of s) {
-      if (Norm.isAlpha(ch) || !skipOnNonAlpha) n++;
-    }
-    return n;
-    }
-
   // すべて暗号化ボタン（一括実行）
   enc.runBtn.addEventListener('click', () => {
     if (!encReset()) return;
-    encState.opts = { ...getEncOpts('enc') };
     const startTime = performance.now();
-    const res = Beaufort.encrypt({
-      text: enc.plain.value,
-      key: enc.key.value,
-      nonAlpha: enc.nonAlpha.value,
-      upper: enc.upper.checked,
-      skipOnNonAlpha: enc.skipNonAlpha.checked,
-      stepCb: (s) => {
-        if (!s.raw) {
-          Viz.clearHighlights(enc.matrix);
-        } else {
-          const row = s.raw.k;
-          const col = s.raw.p;
-          Viz.clearHighlights(enc.matrix);
-          Viz.highlight(enc.matrix, { rowIndex: row, colIndex: col });
-        }
-        Viz.addStepRow(enc.stepsBody, [
-          (s.i + 1).toString(),
-          s.inCh,
-          s.keyCh,
-          s.formula,
-          s.numeric,
-          s.outCh
-        ]);
-      }
-    });
-    enc.out.value = res.output;
+    const steps = encState.steps;
+    for (const step of steps.slice(0, 300)) renderStep(enc, step);
+    if (steps.length > 300) renderStep(enc, steps[steps.length - 1]);
+    enc.out.value = encState.output;
     const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
     encState.i = encState.input.length;
     updateEncProgress();
@@ -303,7 +280,6 @@
 
   // 次の1文字ボタン
   enc.stepBtn.addEventListener('click', () => {
-    if (!encState.opts) encState.opts = { ...getEncOpts('enc') };
     if (encState.i === 0) {
       if (!encReset()) return;
     }
@@ -312,7 +288,6 @@
 
   // アニメーションボタン
   enc.playBtn.addEventListener('click', () => {
-    if (!encState.opts) encState.opts = { ...getEncOpts('enc') };
     if (encState.i === 0) {
       if (!encReset()) return;
     }
@@ -350,8 +325,7 @@
 
   // コピーボタン
   enc.copyBtn.addEventListener('click', async () => {
-    await navigator.clipboard.writeText(enc.out.value || '');
-    Toast.show('暗号文をコピー');
+    await copyText(enc.out.value || '');
   });
 
   // クリアボタン
@@ -359,9 +333,7 @@
     encStop();
     enc.plain.value = '';
     enc.key.value = '';
-    enc.out.value = '';
-    enc.stepsBody.innerHTML = '';
-    Viz.clearHighlights(enc.matrix);
+    invalidate('enc');
   });
 
   // ===== 復号タブ =====
@@ -371,7 +343,6 @@
     nonAlpha: $('#decNonAlpha'),
     upper: $('#decUpper'),
     skipNonAlpha: $('#decSkipNonAlpha'),
-    showVig: $('#decShowVig'),
     speed: $('#decSpeed'),
     runBtn: $('#decRunBtn'),
     stepBtn: $('#decStepBtn'),
@@ -385,26 +356,17 @@
   };
 
   // 復号の状態管理
-  let decState = { i: 0, input: '', key: '', opts: null, playing: false, timer: null };
+  let decState = { i: 0, input: [], key: '', opts: null, steps: [], output: '', playing: false, timer: null };
 
   // 復号をリセット
   function decReset() {
-    decState.i = 0;
-    decState.input = Norm.normalize(dec.cipher.value, { upper: dec.upper.checked, nonAlpha: dec.nonAlpha.value });
-    decState.key = dec.key.value.toUpperCase().replace(/[^A-Z]/g, '');
+    decStop();
     dec.out.value = '';
     dec.stepsBody.innerHTML = '';
     Viz.clearHighlights(dec.matrix);
-    if (!decState.key.length) {
-      Toast.show('鍵（鍵文字列）に英字が含まれていません');
-      return false;
-    }
-    return true;
-  }
-
-  // 復号用の鍵消費カウント（共通関数を再利用）
-  function countKeyConsumesDec(s, skipOnNonAlpha) {
-    return countKeyConsumes(s, skipOnNonAlpha);
+    const valid = prepare(decState, 'dec', dec.cipher.value, dec.key.value);
+    updateDecProgress();
+    return valid;
   }
 
   // 1文字だけ復号を進める
@@ -414,34 +376,9 @@
       return false;
     }
 
-    const ch = decState.input[decState.i];
-    const opts = decState.opts;
-
-    const keyIndex = countKeyConsumes(decState.input.slice(0, decState.i), opts.skipOnNonAlpha);
-    const kch = decState.key.length ? decState.key[keyIndex % decState.key.length] : '';
-
-    let step;
-    if (Norm.isAlpha(ch)) {
-      step = Beaufort.stepDecryptChar(ch, kch);
-      const row = Norm.idx(kch);
-      const col = Norm.idx(ch);
-      Viz.clearHighlights(dec.matrix);
-      Viz.highlight(dec.matrix, { rowIndex: row, colIndex: col });
-    } else {
-      step = { out: ch, formula: '', numeric: '', raw: null };
-      Viz.clearHighlights(dec.matrix);
-    }
-
-    dec.out.value += step.out;
-
-    Viz.addStepRow(dec.stepsBody, [
-      (decState.i + 1).toString(),
-      ch,
-      Norm.isAlpha(ch) || !opts.skipOnNonAlpha ? (kch || '') : '',
-      step.formula,
-      step.numeric,
-      step.out
-    ]);
+    const step = decState.steps[decState.i];
+    dec.out.value += step.outCh;
+    renderStep(dec, step);
 
     decState.i++;
     updateDecProgress();
@@ -464,7 +401,7 @@
   // アニメーション停止
   function decStop() {
     decState.playing = false;
-    dec.playBtn.textContent = '再生 ▶';
+    dec.playBtn.textContent = '▶ アニメーション';
     if (decState.timer) clearTimeout(decState.timer);
     decState.timer = null;
   }
@@ -472,34 +409,11 @@
   // すべて復号ボタン（一括実行）
   dec.runBtn.addEventListener('click', () => {
     if (!decReset()) return;
-    decState.opts = { ...getEncOpts('dec') };
     const startTime = performance.now();
-    const res = Beaufort.decrypt({
-      text: dec.cipher.value,
-      key: dec.key.value,
-      nonAlpha: dec.nonAlpha.value,
-      upper: dec.upper.checked,
-      skipOnNonAlpha: dec.skipNonAlpha.checked,
-      stepCb: (s) => {
-        if (!s.raw) {
-          Viz.clearHighlights(dec.matrix);
-        } else {
-          const row = s.raw.k;
-          const col = s.raw.c;
-          Viz.clearHighlights(dec.matrix);
-          Viz.highlight(dec.matrix, { rowIndex: row, colIndex: col });
-        }
-        Viz.addStepRow(dec.stepsBody, [
-          (s.i + 1).toString(),
-          s.inCh,
-          s.keyCh,
-          s.formula,
-          s.numeric,
-          s.outCh
-        ]);
-      }
-    });
-    dec.out.value = res.output;
+    const steps = decState.steps;
+    for (const step of steps.slice(0, 300)) renderStep(dec, step);
+    if (steps.length > 300) renderStep(dec, steps[steps.length - 1]);
+    dec.out.value = decState.output;
     const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
     decState.i = decState.input.length;
     updateDecProgress();
@@ -508,7 +422,6 @@
 
   // 次の1文字ボタン
   dec.stepBtn.addEventListener('click', () => {
-    if (!decState.opts) decState.opts = { ...getEncOpts('dec') };
     if (decState.i === 0) {
       if (!decReset()) return;
     }
@@ -517,7 +430,6 @@
 
   // アニメーションボタン
   dec.playBtn.addEventListener('click', () => {
-    if (!decState.opts) decState.opts = { ...getEncOpts('dec') };
     if (decState.i === 0) {
       if (!decReset()) return;
     }
@@ -555,8 +467,7 @@
 
   // コピーボタン
   dec.copyBtn.addEventListener('click', async () => {
-    await navigator.clipboard.writeText(dec.out.value || '');
-    Toast.show('平文をコピー');
+    await copyText(dec.out.value || '');
   });
 
   // クリアボタン
@@ -564,27 +475,64 @@
     decStop();
     dec.cipher.value = '';
     dec.key.value = '';
-    dec.out.value = '';
-    dec.stepsBody.innerHTML = '';
-    Viz.clearHighlights(dec.matrix);
+    invalidate('dec');
   });
+
+  function invalidate(prefix) {
+    const panel = prefix === 'enc' ? enc : dec;
+    const state = prefix === 'enc' ? encState : decState;
+    (prefix === 'enc' ? encStop : decStop)();
+    Object.assign(state, { i: 0, input: [], key: '', opts: null, steps: [], output: '' });
+    panel.out.value = '';
+    panel.stepsBody.innerHTML = '';
+    Viz.clearHighlights(panel.matrix);
+    (prefix === 'enc' ? updateEncProgress : updateDecProgress)();
+  }
+
+  for (const [prefix, inputs] of [
+    ['enc', [enc.plain, enc.key, enc.nonAlpha, enc.upper, enc.skipNonAlpha]],
+    ['dec', [dec.cipher, dec.key, dec.nonAlpha, dec.upper, dec.skipNonAlpha]]
+  ]) for (const input of inputs) {
+    input.addEventListener('input', () => invalidate(prefix));
+    input.addEventListener('change', () => invalidate(prefix));
+  }
+  for (const input of [kg.keyword, kg.plain, kg.repeat, kg.skipNonAlpha, kg.upper, kg.nonAlpha]) {
+    input.addEventListener('input', () => { kg.expanded.value = ''; kg.table.innerHTML = ''; });
+    input.addEventListener('change', () => { kg.expanded.value = ''; kg.table.innerHTML = ''; });
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { encStop(); decStop(); }
+  });
+  window.addEventListener('pagehide', () => { encStop(); decStop(); });
+
+  async function copyText(value) {
+    try {
+      await navigator.clipboard.writeText(value);
+      Toast.show('コピーしました');
+    } catch {
+      Toast.show('コピーできません。結果欄を選択して手動でコピーしてください');
+    }
+  }
 
   // ===== キーボードショートカット =====
   document.addEventListener('keydown', (e) => {
     const active = $('.panel.active')?.id || '';
+    if (e.isComposing || e.repeat) return;
+    if (helpModal.style.display === 'flex' && e.key !== 'Escape') return;
     // Ctrl+Enter: 一括実行
-    if (e.ctrlKey && e.key === 'Enter') {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
       if (active === 'tab-encrypt') enc.runBtn.click();
       if (active === 'tab-decrypt') dec.runBtn.click();
     }
     // Space: 再生/一時停止
-    if (e.key === ' ' && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+    if (e.key === ' ' && !document.activeElement.closest('input, textarea, select, button, a, summary, [contenteditable="true"]')) {
       e.preventDefault();
       if (active === 'tab-encrypt') enc.playBtn.click();
       if (active === 'tab-decrypt') dec.playBtn.click();
     }
     // →: 次の1文字
-    if (e.key === 'ArrowRight' && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+    if (e.key === 'ArrowRight' && !document.activeElement.closest('input, textarea, select, button, a, summary, [contenteditable="true"]')) {
       if (active === 'tab-encrypt') enc.stepBtn.click();
       if (active === 'tab-decrypt') dec.stepBtn.click();
     }
@@ -599,7 +547,7 @@
       if (active === 'tab-decrypt') dec.resetBtn.click();
     }
     // ?: ヘルプを表示
-    if (e.key === '?' && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+    if (e.key === '?' && !document.activeElement.closest('input, textarea, select, button, a, summary, [contenteditable="true"]')) {
       e.preventDefault();
       $('#helpToggle')?.click();
     }
