@@ -321,6 +321,12 @@ Compare the row, column, intersection, and numeric calculation in the step table
 
 ### Use cases
 
+Ways of using this tool in particular
+
+- Confirming that encryption and decryption are the same operation (involution and cipher classes): in the Beaufort cipher, encryption and decryption are exactly the same calculation. Encrypting HELLO with the key KEY gives DANZQ, and encrypting DANZQ again with the same key KEY (not decrypting) returns HELLO. Being its own inverse (an involution), it can be reversed with the same procedure
+- Confirming that each letter is "key minus plaintext" (modular and formula classes): each ciphertext letter is the remainder of the key letter minus the plaintext letter (C = (K - P) mod 26). Encrypting plaintext H (7) with key K (10) gives 10 - 7 = 3, D. Unlike the Vigenere cipher, which adds the key and plaintext, you can confirm it is computed by subtraction
+- Confirming that all 26 x 26 = 676 pairs match the subtraction (exhaustive-check classes): for all 676 combinations of one plaintext letter and one key letter, the ciphertext matches (K - P) mod 26, and reversing with the same key returns the plaintext. You can confirm, exhaustively, that every cell of the table is explained by one formula
+
 - Teaching: verify a manually calculated letter using both the table and formula
 - Self-study: change case and non-letter options to explore what decryption can restore
 - Puzzle creation: produce a short message with a known answer and key, then check it by decrypting

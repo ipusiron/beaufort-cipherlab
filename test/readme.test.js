@@ -87,3 +87,23 @@ test('language links, table values, sources and image inventory match', () => {
   }
   assert.ok(ja.startsWith('<!--\n---\nid: day078\nslug: beaufort-cipherlab'));
 });
+
+test('ユースケースの「このツールならではの使い方」を beaufort.js で再計算（日英）', () => {
+  const scope = vm.createContext({});
+  scope.window = scope;
+  for (const name of ['normalize', 'beaufort']) {
+    vm.runInContext(fs.readFileSync(path.join(root, 'js', name + '.js'), 'utf8'), scope);
+  }
+  const B = scope.Beaufort;
+  assert.equal(B.encrypt({ text: 'HELLO', key: 'KEY' }).output, 'DANZQ');
+  assert.equal(B.encrypt({ text: 'DANZQ', key: 'KEY' }).output, 'HELLO');
+  let allMatch = true;
+  for (let p = 0; p < 26; p++) for (let k = 0; k < 26; k++) {
+    const c = B.encrypt({ text: String.fromCharCode(65 + p), key: String.fromCharCode(65 + k) }).output;
+    if (c !== String.fromCharCode(65 + (k - p + 26) % 26)) allMatch = false;
+  }
+  assert.ok(allMatch);
+  for (const md of [ja, en]) {
+    assert.ok(md.includes('DANZQ') && md.includes('676'));
+  }
+});
