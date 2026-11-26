@@ -18,7 +18,7 @@ category_en:
   - Classical Cryptography
   - Substitution Cipher
 
-difficulty: 4
+difficulty: 2
 
 tags:
   - beaufort
